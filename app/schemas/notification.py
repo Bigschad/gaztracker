@@ -145,10 +145,11 @@ class NotificationResponse(NotificationBase):
 class NotificationListResponse(BaseModel):
     """Schema for paginated notification list response."""
 
+    items: list[NotificationResponse] = Field(..., description="List of notifications")
     total: int = Field(..., description="Total number of notifications")
     page: int = Field(..., description="Current page number")
     page_size: int = Field(..., description="Items per page")
-    notifications: list[NotificationResponse] = Field(..., description="List of notifications")
+    total_pages: int = Field(..., description="Total number of pages")
 
     model_config = ConfigDict(
         json_schema_extra={

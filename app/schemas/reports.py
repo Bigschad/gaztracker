@@ -244,12 +244,33 @@ class PerformanceReport(BaseModel):
 # Dashboard Schemas
 # =============================================================================
 
-class OverviewMetrics(BaseModel):
-    """Schema for dashboard overview metrics."""
-    total_palettes: int = Field(..., description="Total palettes")
-    available_palettes: int = Field(..., description="Available palettes")
-    active_expeditions: int = Field(..., description="Active expeditions")
-    pending_notifications: int = Field(..., description="Pending notifications")
+class PaletteStats(BaseModel):
+    """Schema for palette statistics in dashboard."""
+    total: int = Field(..., description="Total palettes")
+    available: int = Field(..., description="Available palettes")
+    in_transit: int = Field(..., description="Palettes in transit")
+    utilization_rate: float = Field(..., description="Utilization rate percentage")
+
+    class Config:
+        from_attributes = True
+
+
+class ExpeditionStats(BaseModel):
+    """Schema for expedition statistics in dashboard."""
+    total: int = Field(..., description="Total expeditions")
+    in_transit: int = Field(..., description="Expeditions in transit")
+    completed_today: int = Field(..., description="Expeditions completed today")
+    delayed: int = Field(..., description="Delayed expeditions")
+
+    class Config:
+        from_attributes = True
+
+
+class NotificationStats(BaseModel):
+    """Schema for notification statistics in dashboard."""
+    total: int = Field(..., description="Total notifications")
+    sent_today: int = Field(..., description="Notifications sent today")
+    failed_today: int = Field(..., description="Notifications failed today")
 
     class Config:
         from_attributes = True
@@ -257,8 +278,9 @@ class OverviewMetrics(BaseModel):
 
 class RecentActivity(BaseModel):
     """Schema for recent activity metrics."""
-    expeditions_24h: int = Field(..., description="Expeditions created in last 24h")
-    movements_24h: int = Field(..., description="Palette movements in last 24h")
+    recent_expeditions: int = Field(..., description="Recent expeditions")
+    recent_deliveries: int = Field(..., description="Recent deliveries")
+    pending_validations: int = Field(..., description="Pending validations")
 
     class Config:
         from_attributes = True
@@ -268,6 +290,16 @@ class AlertMetrics(BaseModel):
     """Schema for alert metrics."""
     delayed_expeditions: int = Field(..., description="Delayed expeditions")
     pending_validations: int = Field(..., description="Pending validations")
+    failed_notifications: int = Field(..., description="Failed notifications")
+
+    class Config:
+        from_attributes = True
+
+
+class TrendDataPoint(BaseModel):
+    """Schema for trend data point."""
+    date: str = Field(..., description="Date")
+    count: int = Field(..., description="Count")
 
     class Config:
         from_attributes = True
@@ -275,8 +307,8 @@ class AlertMetrics(BaseModel):
 
 class DashboardTrends(BaseModel):
     """Schema for dashboard trends."""
-    expeditions: List[DailyExpeditionData] = Field(..., description="Expedition trend (7 days)")
-    palette_utilization: List[DailyUtilizationData] = Field(..., description="Palette utilization (7 days)")
+    expeditions_7days: List[TrendDataPoint] = Field(..., description="Expedition trend (7 days)")
+    deliveries_7days: List[TrendDataPoint] = Field(..., description="Delivery trend (7 days)")
 
     class Config:
         from_attributes = True
@@ -284,10 +316,14 @@ class DashboardTrends(BaseModel):
 
 class DashboardOverview(BaseModel):
     """Schema for complete dashboard overview."""
-    overview: OverviewMetrics = Field(..., description="Overview metrics")
+    palette_stats: PaletteStats = Field(..., description="Palette statistics")
+    expedition_stats: ExpeditionStats = Field(..., description="Expedition statistics")
+    notification_stats: NotificationStats = Field(..., description="Notification statistics")
     recent_activity: RecentActivity = Field(..., description="Recent activity")
     alerts: AlertMetrics = Field(..., description="Alert counts")
     trends: DashboardTrends = Field(..., description="Trends data")
+    health_score: float = Field(..., description="Overall health score (0-100)")
+    health_status: str = Field(..., description="Health status (EXCELLENT, GOOD, FAIR, POOR)")
 
     class Config:
         from_attributes = True

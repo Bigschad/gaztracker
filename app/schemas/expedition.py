@@ -165,10 +165,11 @@ class ExpeditionResponse(ExpeditionBase):
 class ExpeditionListResponse(BaseModel):
     """Schema for paginated expedition list response."""
 
+    items: list[ExpeditionResponse] = Field(..., description="List of expeditions")
     total: int = Field(..., description="Total number of expeditions")
     page: int = Field(..., description="Current page number")
     page_size: int = Field(..., description="Items per page")
-    expeditions: list[ExpeditionResponse] = Field(..., description="List of expeditions")
+    total_pages: int = Field(..., description="Total number of pages")
 
     model_config = ConfigDict(
         json_schema_extra={

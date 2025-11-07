@@ -264,7 +264,7 @@ async def get_dashboard_overview(
     - 7-day trends (expeditions, palette utilization)
     """
     reports_service = ReportsService(db)
-    overview = reports_service.get_dashboard_overview()
+    overview = await reports_service.get_dashboard_overview()
     return DashboardOverview(**overview)
 
 
@@ -407,14 +407,14 @@ async def get_quick_stats(
 
     total_palettes = db.query(func.count(Palette.id)).scalar()
     available_palettes = db.query(func.count(Palette.id)).filter(
-        Palette.status == PaletteStatus.DISPONIBLE
+        Palette.status == PaletteStatus.EN_STOCK
     ).scalar()
 
     active_expeditions = db.query(func.count(Expedition.id)).filter(
         Expedition.status.in_([
-            ExpeditionStatus.PREPAREE,
-            ExpeditionStatus.DEPART,
-            ExpeditionStatus.EN_ROUTE
+            ExpeditionStatus.CREEE,
+            ExpeditionStatus.EN_TRANSIT,
+            ExpeditionStatus.ARRIVEE
         ])
     ).scalar()
 

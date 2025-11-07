@@ -553,11 +553,11 @@ Ce projet est propriétaire. Tous droits réservés.
 
 ## 👥 Équipe
 
-- **Lead Developer**: [Votre nom]
-- **Backend Developer**: [Votre nom]
-- **DevOps**: [Votre nom]
+- **Lead Developer**: Schad YEYE
+- **Backend Developer**: Schad YEYE
+- **DevOps**: Schad YEYE
 
 ---
 
 **Version**: 1.0.0 - Phase 1
-**Dernière mise à jour**: 2024-01-15
+**Dernière mise à jour**: 2025-11-05

@@ -18,6 +18,7 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.2.1
 pyjwt==2.10.1
+setuptools<81  # Pin to avoid pkg_resources deprecation warning in passlib
 
 # Validation & Serialization
 pydantic==2.10.3
