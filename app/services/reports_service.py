@@ -10,7 +10,8 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_, case, extract
+from sqlalchemy import func, and_, or_, case, extract, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from collections import defaultdict
 
 from app.models.palette import Palette, PaletteStatus
@@ -110,12 +111,12 @@ class ReportsService:
                 for p in most_used
             ],
             "maintenance_needed": maintenance_needed,
-            "available_palettes": by_status.get("DISPONIBLE", 0),
-            "in_use_palettes": by_status.get("EN_EXPEDITION", 0),
-            "damaged_palettes": by_status.get("ENDOMMAGEE", 0)
+            "available_palettes": by_status.get("EN_STOCK", 0),
+            "in_use_palettes": by_status.get("EN_ROUTE", 0),
+            "damaged_palettes": by_status.get("OUT", 0)
         }
 
-    def get_palette_utilization_trend(
+    async def get_palette_utilization_trend(
         self,
         days: int = 30
     ) -> List[Dict[str, Any]]:
@@ -134,18 +135,21 @@ class ReportsService:
         start_date = end_date - timedelta(days=days)
 
         # Query movements per day
-        daily_data = self.db.query(
+        stmt = select(
             func.date(PaletteMovement.timestamp).label('date'),
             func.count(PaletteMovement.id).label('movement_count'),
             func.count(func.distinct(PaletteMovement.palette_id)).label('unique_palettes')
-        ).filter(
+        ).where(
             PaletteMovement.timestamp >= start_date,
             PaletteMovement.timestamp <= end_date
         ).group_by(
             func.date(PaletteMovement.timestamp)
         ).order_by(
             func.date(PaletteMovement.timestamp)
-        ).all()
+        )
+
+        result = await self.db.execute(stmt)
+        daily_data = result.all()
 
         return [
             {
@@ -260,13 +264,14 @@ class ReportsService:
             "completed_expeditions": len(completed),
             "active_expeditions": query.filter(
                 Expedition.status.in_([
-                    ExpeditionStatus.DEPART,
-                    ExpeditionStatus.EN_ROUTE
+                    ExpeditionStatus.CREEE,
+                    ExpeditionStatus.EN_TRANSIT,
+                    ExpeditionStatus.ARRIVEE
                 ])
             ).count()
         }
 
-    def get_expedition_trend(
+    async def get_expedition_trend(
         self,
         days: int = 30
     ) -> List[Dict[str, Any]]:
@@ -284,18 +289,21 @@ class ReportsService:
         end_date = datetime.utcnow()
         start_date = end_date - timedelta(days=days)
 
-        daily_data = self.db.query(
+        stmt = select(
             func.date(Expedition.created_at).label('date'),
             func.count(Expedition.id).label('expedition_count'),
             func.sum(Expedition.palette_count).label('total_palettes')
-        ).filter(
+        ).where(
             Expedition.created_at >= start_date,
             Expedition.created_at <= end_date
         ).group_by(
             func.date(Expedition.created_at)
         ).order_by(
             func.date(Expedition.created_at)
-        ).all()
+        )
+
+        result = await self.db.execute(stmt)
+        daily_data = result.all()
 
         return [
             {
@@ -460,7 +468,7 @@ class ReportsService:
     # Dashboard Data
     # =============================================================================
 
-    def get_dashboard_overview(self) -> Dict[str, Any]:
+    async def get_dashboard_overview(self) -> Dict[str, Any]:
         """
         Get complete dashboard overview data.
 
@@ -469,65 +477,190 @@ class ReportsService:
         """
         logger.info("Generating dashboard overview...")
 
-        # Quick stats
-        total_palettes = self.db.query(func.count(Palette.id)).scalar()
-        available_palettes = self.db.query(func.count(Palette.id)).filter(
-            Palette.status == PaletteStatus.DISPONIBLE
-        ).scalar()
+        # Palette Stats
+        result = await self.db.execute(select(func.count()).select_from(Palette))
+        total_palettes = result.scalar() or 0
 
-        active_expeditions = self.db.query(func.count(Expedition.id)).filter(
-            Expedition.status.in_([
-                ExpeditionStatus.PREPAREE,
-                ExpeditionStatus.DEPART,
-                ExpeditionStatus.EN_ROUTE
-            ])
-        ).scalar()
+        result = await self.db.execute(
+            select(func.count()).select_from(Palette).where(
+                Palette.status == PaletteStatus.EN_STOCK
+            )
+        )
+        available_palettes = result.scalar() or 0
 
-        pending_notifications = self.db.query(func.count(Notification.id)).filter(
-            Notification.status == NotificationStatus.PENDING
-        ).scalar()
+        result = await self.db.execute(
+            select(func.count()).select_from(Palette).where(
+                Palette.status == PaletteStatus.EN_ROUTE
+            )
+        )
+        palettes_in_transit = result.scalar() or 0
 
-        # Recent activity (last 24 hours)
+        # Calculate utilization rate
+        utilization_rate = (palettes_in_transit / total_palettes * 100) if total_palettes > 0 else 0.0
+
+        # Expedition Stats
+        result = await self.db.execute(select(func.count()).select_from(Expedition))
+        total_expeditions = result.scalar() or 0
+
+        result = await self.db.execute(
+            select(func.count()).select_from(Expedition).where(
+                Expedition.status == ExpeditionStatus.EN_TRANSIT
+            )
+        )
+        expeditions_in_transit = result.scalar() or 0
+
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        result = await self.db.execute(
+            select(func.count()).select_from(Expedition).where(
+                Expedition.status == ExpeditionStatus.LIVREE,
+                Expedition.date_delivery >= today_start
+            )
+        )
+        completed_today = result.scalar() or 0
+
+        result = await self.db.execute(
+            select(func.count()).select_from(Expedition).where(
+                Expedition.eta < datetime.utcnow(),
+                Expedition.status.notin_([ExpeditionStatus.LIVREE, ExpeditionStatus.ANNULEE]),
+                Expedition.eta.isnot(None)
+            )
+        )
+        delayed_expeditions = result.scalar() or 0
+
+        # Notification Stats
+        result = await self.db.execute(select(func.count()).select_from(Notification))
+        total_notifications = result.scalar() or 0
+
+        result = await self.db.execute(
+            select(func.count()).select_from(Notification).where(
+                Notification.status == NotificationStatus.SENT,
+                Notification.created_at >= today_start
+            )
+        )
+        sent_today = result.scalar() or 0
+
+        result = await self.db.execute(
+            select(func.count()).select_from(Notification).where(
+                Notification.status == NotificationStatus.FAILED,
+                Notification.created_at >= today_start
+            )
+        )
+        failed_today = result.scalar() or 0
+
+        # Recent Activity (last 24 hours)
         last_24h = datetime.utcnow() - timedelta(hours=24)
 
-        recent_expeditions = self.db.query(func.count(Expedition.id)).filter(
-            Expedition.created_at >= last_24h
-        ).scalar()
+        result = await self.db.execute(
+            select(func.count()).select_from(Expedition).where(
+                Expedition.created_at >= last_24h
+            )
+        )
+        recent_expeditions = result.scalar() or 0
 
-        recent_movements = self.db.query(func.count(PaletteMovement.id)).filter(
-            PaletteMovement.timestamp >= last_24h
-        ).scalar()
+        result = await self.db.execute(
+            select(func.count()).select_from(Expedition).where(
+                Expedition.status == ExpeditionStatus.LIVREE,
+                Expedition.date_delivery >= last_24h
+            )
+        )
+        recent_deliveries = result.scalar() or 0
+
+        result = await self.db.execute(
+            select(func.count()).select_from(Expedition).where(
+                Expedition.status == ExpeditionStatus.ARRIVEE
+            )
+        )
+        pending_validations = result.scalar() or 0
 
         # Alerts
-        delayed_expeditions = self.db.query(func.count(Expedition.id)).filter(
-            Expedition.eta < datetime.utcnow(),
-            Expedition.status.notin_([ExpeditionStatus.LIVREE, ExpeditionStatus.ANNULEE]),
-            Expedition.eta.isnot(None)
-        ).scalar()
+        result = await self.db.execute(
+            select(func.count()).select_from(Notification).where(
+                Notification.status == NotificationStatus.FAILED
+            )
+        )
+        failed_notifications = result.scalar() or 0
 
-        pending_validations = self.db.query(func.count(Expedition.id)).filter(
-            Expedition.status == ExpeditionStatus.ARRIVEE
-        ).scalar()
+        # Trends (7 days)
+        expedition_trend = await self.get_expedition_trend(days=7)
+        expeditions_7days = [
+            {"date": item["date"], "count": item["expedition_count"]}
+            for item in expedition_trend
+        ]
+
+        # For deliveries, we'll get completed expeditions in the last 7 days
+        seven_days_ago = datetime.utcnow() - timedelta(days=7)
+        result = await self.db.execute(
+            select(
+                func.date(Expedition.date_delivery).label('date'),
+                func.count(Expedition.id).label('count')
+            ).where(
+                Expedition.date_delivery >= seven_days_ago,
+                Expedition.status == ExpeditionStatus.LIVREE
+            ).group_by(
+                func.date(Expedition.date_delivery)
+            ).order_by(
+                func.date(Expedition.date_delivery)
+            )
+        )
+        deliveries_data = result.all()
+        deliveries_7days = [
+            {"date": str(row.date), "count": row.count}
+            for row in deliveries_data
+        ]
+
+        # Calculate health score
+        expedition_success_rate = (completed_today / expeditions_in_transit * 100) if expeditions_in_transit > 0 else 100.0
+        notification_success_rate = ((sent_today / (sent_today + failed_today)) * 100) if (sent_today + failed_today) > 0 else 100.0
+
+        health_score = (
+            expedition_success_rate * 0.5 +
+            utilization_rate * 0.3 +
+            notification_success_rate * 0.2
+        )
+
+        if health_score >= 80:
+            health_status = "EXCELLENT"
+        elif health_score >= 60:
+            health_status = "GOOD"
+        elif health_score >= 40:
+            health_status = "FAIR"
+        else:
+            health_status = "POOR"
 
         return {
-            "overview": {
-                "total_palettes": total_palettes,
-                "available_palettes": available_palettes,
-                "active_expeditions": active_expeditions,
-                "pending_notifications": pending_notifications
+            "palette_stats": {
+                "total": total_palettes,
+                "available": available_palettes,
+                "in_transit": palettes_in_transit,
+                "utilization_rate": round(utilization_rate, 2)
+            },
+            "expedition_stats": {
+                "total": total_expeditions,
+                "in_transit": expeditions_in_transit,
+                "completed_today": completed_today,
+                "delayed": delayed_expeditions
+            },
+            "notification_stats": {
+                "total": total_notifications,
+                "sent_today": sent_today,
+                "failed_today": failed_today
             },
             "recent_activity": {
-                "expeditions_24h": recent_expeditions,
-                "movements_24h": recent_movements
+                "recent_expeditions": recent_expeditions,
+                "recent_deliveries": recent_deliveries,
+                "pending_validations": pending_validations
             },
             "alerts": {
                 "delayed_expeditions": delayed_expeditions,
-                "pending_validations": pending_validations
+                "pending_validations": pending_validations,
+                "failed_notifications": failed_notifications
             },
             "trends": {
-                "expeditions": self.get_expedition_trend(days=7),
-                "palette_utilization": self.get_palette_utilization_trend(days=7)
-            }
+                "expeditions_7days": expeditions_7days,
+                "deliveries_7days": deliveries_7days
+            },
+            "health_score": round(health_score, 2),
+            "health_status": health_status
         }
 
     # =============================================================================

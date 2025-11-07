@@ -36,9 +36,9 @@ def upgrade() -> None:
     op.create_table(
         'rfid_tags',
         sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
-        sa.Column('tag_number', sa.String(length=50), unique=True, nullable=False, index=True),
+        sa.Column('tag_number', sa.String(length=50), unique=True, nullable=False),
         sa.Column('status', sa.Enum('NOT_ASSIGNED', 'ASSIGNED', 'LOST', 'DAMAGED', name='rfidtagstatus'),
-                  nullable=False, default='NOT_ASSIGNED', index=True),
+                  nullable=False, default='NOT_ASSIGNED'),
         sa.Column('created_by_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('users.id'), nullable=False),
         sa.Column('notes', sa.String(length=500), nullable=True),
         sa.Column('is_active', sa.Boolean(), nullable=False, default=True),
@@ -48,8 +48,7 @@ def upgrade() -> None:
     )
 
     # Create indexes on rfid_tags
-    op.create_index('ix_rfid_tags_id', 'rfid_tags', ['id'])
-    op.create_index('ix_rfid_tags_tag_number', 'rfid_tags', ['tag_number'], unique=True)
+    # Note: tag_number already has unique constraint, so we add indexes for other columns
     op.create_index('ix_rfid_tags_status', 'rfid_tags', ['status'])
     op.create_index('ix_rfid_tags_created_by_id', 'rfid_tags', ['created_by_id'])
     op.create_index('ix_rfid_tags_created_at', 'rfid_tags', ['created_at'])
@@ -166,8 +165,6 @@ def downgrade() -> None:
     op.drop_index('ix_rfid_tags_created_at', table_name='rfid_tags')
     op.drop_index('ix_rfid_tags_created_by_id', table_name='rfid_tags')
     op.drop_index('ix_rfid_tags_status', table_name='rfid_tags')
-    op.drop_index('ix_rfid_tags_tag_number', table_name='rfid_tags')
-    op.drop_index('ix_rfid_tags_id', table_name='rfid_tags')
     op.drop_table('rfid_tags')
 
     # Drop enum type

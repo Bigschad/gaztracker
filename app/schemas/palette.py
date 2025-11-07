@@ -168,10 +168,11 @@ class PaletteDetailResponse(PaletteResponse):
 class PaletteListResponse(BaseModel):
     """Schema for paginated palette list response."""
 
+    items: list[PaletteResponse] = Field(..., description="List of palettes")
     total: int = Field(..., description="Total number of palettes")
     page: int = Field(..., description="Current page number")
     page_size: int = Field(..., description="Items per page")
-    palettes: list[PaletteResponse] = Field(..., description="List of palettes")
+    total_pages: int = Field(..., description="Total number of pages")
 
     model_config = ConfigDict(
         json_schema_extra={

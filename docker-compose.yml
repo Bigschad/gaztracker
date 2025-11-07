@@ -8,7 +8,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: gaztracker_app
+    container_name: gaztracker_backend
     restart: unless-stopped
     env_file:
       - .env.docker
@@ -30,6 +30,24 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  # =============================================================================
+  # React Frontend (Back Office)
+  # =============================================================================
+  frontend:
+    build:
+      context: ./backoffice-web
+      dockerfile: Dockerfile
+    container_name: gaztracker_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    networks:
+      - gaztracker_network
+    depends_on:
+      - app
+    environment:
+      - VITE_API_URL=http://localhost:8000
 
   # =============================================================================
   # PostgreSQL Database

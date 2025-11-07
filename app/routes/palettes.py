@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 from typing import Optional
 import logging
+import math
 
 from app.database import get_db
 from app.middleware.auth_middleware import get_current_user
@@ -36,7 +37,7 @@ router = APIRouter()
 
 
 @router.post(
-    "/",
+    "",
     response_model=PaletteResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a new palette",
@@ -165,7 +166,7 @@ async def get_palette_by_rfid(
 
 
 @router.get(
-    "/",
+    "",
     response_model=PaletteListResponse,
     summary="List palettes",
     description="""
@@ -182,7 +183,7 @@ async def get_palette_by_rfid(
 )
 async def list_palettes(
     type: Optional[PaletteType] = Query(None, description="Filter by palette type"),
-    status: Optional[PaletteStatus] = Query(None, description="Filter by status"),
+    palette_status: Optional[PaletteStatus] = Query(None, description="Filter by status"),
     created_by_id: Optional[UUID] = Query(None, description="Filter by creator"),
     search: Optional[str] = Query(None, description="Search in RFID or notes"),
     page: int = Query(1, ge=1, description="Page number"),
@@ -195,18 +196,21 @@ async def list_palettes(
         palettes, total = PaletteService.list_palettes(
             db,
             palette_type=type,
-            status=status,
+            status=palette_status,
             created_by_id=created_by_id,
             search=search,
             page=page,
             page_size=page_size,
         )
 
+        total_pages = math.ceil(total / page_size) if total > 0 else 1
+
         return PaletteListResponse(
+            items=palettes,
             total=total,
             page=page,
             page_size=page_size,
-            palettes=palettes,
+            total_pages=total_pages,
         )
 
     except Exception as e:

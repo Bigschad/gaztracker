@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: gaztracker_frontend_dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    networks:
+      - gaztracker
+    depends_on:
+      - backend
+
+  backend:
+    image: gaztracker_backend
+    container_name: gaztracker_backend
+    ports:
+      - "8000:8000"
+    networks:
+      - gaztracker
+
+networks:
+  gaztracker:
+    external: true

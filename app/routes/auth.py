@@ -124,8 +124,8 @@ async def logout(
         credentials: HTTP Bearer token
         db: Database session
 
-    Raises:
-        InvalidTokenException: If token is invalid
+    Note:
+        Gracefully handles expired tokens since user is logging out anyway.
     """
     # Extract token
     token = credentials.credentials
@@ -136,16 +136,21 @@ async def logout(
     # Initialize auth service
     auth_service = AuthService(db)
 
-    # Get current user from token (validates token)
-    user = await auth_service.get_current_user(token)
+    try:
+        # Get current user from token (validates token)
+        user = await auth_service.get_current_user(token)
 
-    # Logout user (blacklist token)
-    await auth_service.logout_user(
-        user_id=user.id,
-        token=token,
-        ip_address=ip_address,
-        user_agent=user_agent
-    )
+        # Logout user (blacklist token)
+        await auth_service.logout_user(
+            user_id=user.id,
+            token=token,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+    except Exception:
+        # If token is invalid or expired, that's fine - user is logging out
+        # Just return success without blacklisting the token
+        pass
 
 
 @router.post(

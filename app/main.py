@@ -64,6 +64,7 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json",
     lifespan=lifespan,
+    redirect_slashes=False,
 )
 
 
@@ -110,13 +111,23 @@ async def gaztracker_exception_handler(request: Request, exc: GazTrackerExceptio
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Handle Pydantic validation errors."""
-    logger.warning(f"Validation error: {exc.errors()}")
+    errors = exc.errors()
+    # Convert any bytes to strings for JSON serialization
+    for error in errors:
+        if 'ctx' in error:
+            for key, value in error['ctx'].items():
+                if isinstance(value, bytes):
+                    error['ctx'][key] = value.decode('utf-8', errors='replace')
+        if 'input' in error and isinstance(error['input'], bytes):
+            error['input'] = error['input'].decode('utf-8', errors='replace')
+
+    logger.warning(f"Validation error: {errors}")
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
             "error": "VALIDATION_ERROR",
             "message": "Request validation failed",
-            "details": exc.errors()
+            "details": errors
         }
     )
 

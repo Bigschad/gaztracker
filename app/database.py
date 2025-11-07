@@ -6,15 +6,16 @@ This module handles database connections and session management for:
 - Redis (for caching and session management)
 """
 
-from typing import AsyncGenerator, Optional
-from contextlib import asynccontextmanager
+from typing import AsyncGenerator, Generator, Optional
+from contextlib import asynccontextmanager, contextmanager
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     AsyncEngine,
     create_async_engine,
     async_sessionmaker
 )
-from sqlalchemy.orm import declarative_base
+from sqlalchemy import create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from sqlalchemy.pool import NullPool
 import redis.asyncio as aioredis
 from redis.asyncio import Redis
