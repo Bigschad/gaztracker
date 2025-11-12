@@ -9,8 +9,9 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from uuid import UUID
+import math
 
-from app.database import get_db
+from app.database import get_sync_db
 from app.models.user import User
 from app.models.expedition import ExpeditionStatus
 from app.schemas.expedition import (
@@ -37,7 +38,7 @@ router = APIRouter()
 
 
 @router.post(
-    "/",
+    "",
     response_model=ExpeditionResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a new expedition",
@@ -45,7 +46,7 @@ router = APIRouter()
 )
 async def create_expedition(
     expedition_create: ExpeditionCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE", "OPERATEUR_USINE"]))
 ):
     """
@@ -71,7 +72,7 @@ async def create_expedition(
 
 
 @router.get(
-    "/",
+    "",
     response_model=ExpeditionListResponse,
     summary="List expeditions",
     description="Get a paginated list of expeditions with optional filters."
@@ -82,7 +83,7 @@ async def list_expeditions(
     search: Optional[str] = Query(None, description="Search in reference, transporter, or destination"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -102,11 +103,14 @@ async def list_expeditions(
         page_size=page_size
     )
 
+    total_pages = math.ceil(total / page_size) if total > 0 else 1
+
     return ExpeditionListResponse(
+        items=expeditions,
         total=total,
         page=page,
         page_size=page_size,
-        expeditions=expeditions
+        total_pages=total_pages
     )
 
 
@@ -118,7 +122,7 @@ async def list_expeditions(
 )
 async def get_expedition(
     expedition_id: UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -146,7 +150,7 @@ async def get_expedition(
 async def update_expedition(
     expedition_id: UUID,
     expedition_update: ExpeditionUpdate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE", "OPERATEUR_USINE"]))
 ):
     """
@@ -186,7 +190,7 @@ async def update_expedition(
 async def assign_palettes(
     expedition_id: UUID,
     palette_ids: List[UUID],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE", "OPERATEUR_USINE"]))
 ):
     """
@@ -225,7 +229,7 @@ async def assign_palettes(
 async def mark_as_departed(
     expedition_id: UUID,
     depart_request: ExpeditionDepartRequest,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE", "CHAUFFEUR"]))
 ):
     """
@@ -270,7 +274,7 @@ async def mark_as_departed(
 async def validate_delivery(
     expedition_id: UUID,
     validate_request: ExpeditionValidateRequest,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "GROSSISTE", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
@@ -321,7 +325,7 @@ async def validate_delivery(
 async def cancel_expedition(
     expedition_id: UUID,
     reason: str = Query(..., description="Reason for cancellation"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
@@ -363,7 +367,7 @@ async def cancel_expedition(
     description="Get statistical overview of all expeditions."
 )
 async def get_statistics(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """

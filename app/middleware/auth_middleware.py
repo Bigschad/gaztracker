@@ -8,11 +8,16 @@ from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
+import asyncio
 
-from app.database import get_db
+from app.database import get_db, get_sync_db
 from app.models.user import User
 from app.services.auth_service import AuthService
 from app.utils.exceptions import InvalidTokenException, AuthenticationException
+from app.utils.security import verify_token
+from sqlalchemy import select
+import uuid
 
 
 # HTTP Bearer security scheme
@@ -24,11 +29,11 @@ async def get_current_user(
     db: AsyncSession = Depends(get_db)
 ) -> User:
     """
-    Dependency to get current authenticated user from JWT token.
+    Dependency to get current authenticated user from JWT token (async version).
     
     Args:
         credentials: HTTP Bearer credentials
-        db: Database session
+        db: Database session (async)
         
     Returns:
         User: Current authenticated user
@@ -45,6 +50,70 @@ async def get_current_user(
         token = credentials.credentials
         auth_service = AuthService(db)
         user = await auth_service.get_current_user(token)
+        return user
+        
+    except (InvalidTokenException, AuthenticationException) as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+def get_current_user_sync(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_sync_db)
+) -> User:
+    """
+    Dependency to get current authenticated user from JWT token (sync version).
+    
+    For use with sync database sessions (get_sync_db).
+    
+    Args:
+        credentials: HTTP Bearer credentials
+        db: Database session (sync)
+        
+    Returns:
+        User: Current authenticated user
+        
+    Raises:
+        HTTPException: 401 if authentication fails
+        
+    Example:
+        @app.get("/palettes")
+        async def get_palettes(
+            db: Session = Depends(get_sync_db),
+            current_user: User = Depends(get_current_user_sync)
+        ):
+            return db.query(Palette).all()
+    """
+    try:
+        token = credentials.credentials
+        
+        # Decode and verify token (sync operation)
+        payload = verify_token(token, token_type="access")
+        
+        # Extract user ID
+        user_id = uuid.UUID(payload.get("sub"))
+        
+        # Fetch user from database (sync query)
+        user = db.query(User).filter(User.id == user_id).first()
+        
+        if not user:
+            raise AuthenticationException("User not found")
+        
+        if not user.is_active:
+            raise AuthenticationException("User account is inactive")
+        
+        # Note: We skip Redis blacklist check in sync version for simplicity
+        # If needed, you can add sync Redis client here
+        
         return user
         
     except (InvalidTokenException, AuthenticationException) as e:

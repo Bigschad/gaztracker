@@ -160,10 +160,11 @@ class UserDetailResponse(UserResponse):
 class UserListResponse(BaseModel):
     """Schema for paginated user list response."""
 
+    items: list[UserResponse] = Field(..., description="List of users")
     total: int = Field(..., description="Total number of users")
     page: int = Field(..., description="Current page number")
     page_size: int = Field(..., description="Items per page")
-    users: list[UserResponse] = Field(..., description="List of users")
+    total_pages: int = Field(..., description="Total number of pages")
 
     model_config = ConfigDict(
         json_schema_extra={

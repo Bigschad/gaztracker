@@ -50,20 +50,32 @@ class DatabaseManager:
     def __init__(self) -> None:
         """Initialize database manager with engine and session factory."""
         self.engine: Optional[AsyncEngine] = None
+        self.sync_engine = None
         self.async_session_maker: Optional[async_sessionmaker] = None
+        self.sync_session_maker = None
 
     def init_db(self) -> None:
         """
         Initialize database engine and session factory.
 
-        This method configures the async SQLAlchemy engine with connection pooling
-        and creates a session factory for database operations.
+        This method configures both async and sync SQLAlchemy engines with connection pooling
+        and creates session factories for database operations.
         """
+        # Convert async URL to sync URL
+        sync_database_url = settings.DATABASE_URL.replace(
+            "postgresql+asyncpg://", "postgresql+psycopg2://"
+        )
+
         # Create async engine (poolclass auto-selected for async)
         if settings.is_testing:
             # Use NullPool for testing
             self.engine = create_async_engine(
                 settings.DATABASE_URL,
+                echo=settings.DB_ECHO,
+                poolclass=NullPool,
+            )
+            self.sync_engine = create_engine(
+                sync_database_url,
                 echo=settings.DB_ECHO,
                 poolclass=NullPool,
             )
@@ -78,11 +90,29 @@ class DatabaseManager:
                 pool_recycle=settings.DB_POOL_RECYCLE,
                 pool_pre_ping=True,  # Verify connections before using
             )
+            # Create sync engine
+            self.sync_engine = create_engine(
+                sync_database_url,
+                echo=settings.DB_ECHO,
+                pool_size=settings.DB_POOL_SIZE,
+                max_overflow=settings.DB_MAX_OVERFLOW,
+                pool_timeout=settings.DB_POOL_TIMEOUT,
+                pool_recycle=settings.DB_POOL_RECYCLE,
+                pool_pre_ping=True,
+            )
 
-        # Create session factory
+        # Create session factories
         self.async_session_maker = async_sessionmaker(
             self.engine,
             class_=AsyncSession,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False,
+        )
+
+        self.sync_session_maker = sessionmaker(
+            self.sync_engine,
+            class_=Session,
             expire_on_commit=False,
             autocommit=False,
             autoflush=False,
@@ -94,13 +124,15 @@ class DatabaseManager:
 
     async def close_db(self) -> None:
         """
-        Close database connections and dispose of the engine.
+        Close database connections and dispose of the engines.
 
         This should be called during application shutdown.
         """
         if self.engine:
             await self.engine.dispose()
-            logger.info("Database connections closed")
+        if self.sync_engine:
+            self.sync_engine.dispose()
+        logger.info("Database connections closed")
 
     async def create_tables(self) -> None:
         """
@@ -336,7 +368,7 @@ redis_manager = RedisManager()
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
-    FastAPI dependency for getting database sessions.
+    FastAPI dependency for getting async database sessions.
 
     Yields:
         AsyncSession: Database session
@@ -360,6 +392,34 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             raise
         finally:
             await session.close()
+
+
+def get_sync_db() -> Generator[Session, None, None]:
+    """
+    FastAPI dependency for getting sync database sessions.
+
+    Yields:
+        Session: Database session
+
+    Example:
+        @app.get("/palettes")
+        async def get_palettes(db: Session = Depends(get_sync_db)):
+            palettes = db.query(Palette).all()
+            return palettes
+    """
+    if not db_manager.sync_session_maker:
+        raise RuntimeError("Database not initialized")
+
+    session = db_manager.sync_session_maker()
+    try:
+        yield session
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Database session error: {e}")
+        raise
+    finally:
+        session.close()
 
 
 async def get_redis() -> Redis:

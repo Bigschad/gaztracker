@@ -68,7 +68,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                 <User className="h-4 w-4" />
               </div>
               <span className="hidden text-sm font-medium md:inline-block">
-                {user?.full_name || user?.username}
+                {user ? `${user.first_name} ${user.last_name}` : ''}
               </span>
             </button>
 
@@ -76,7 +76,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
             <div className="absolute right-0 mt-2 w-48 origin-top-right rounded-md bg-card shadow-lg ring-1 ring-black ring-opacity-5 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
               <div className="py-1">
                 <div className="px-4 py-2 text-sm text-muted-foreground border-b">
-                  <p className="font-medium text-foreground">{user?.full_name}</p>
+                  <p className="font-medium text-foreground">
+                    {user ? `${user.first_name} ${user.last_name}` : ''}
+                  </p>
                   <p className="text-xs">{user?.email}</p>
                 </div>
                 <button

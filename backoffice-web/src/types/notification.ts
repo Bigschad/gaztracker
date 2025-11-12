@@ -1,12 +1,16 @@
 // Notification types matching backend schemas
 
 export enum NotificationType {
-  EXPEDITION_CREATED = 'EXPEDITION_CREATED',
-  EXPEDITION_DEPARTED = 'EXPEDITION_DEPARTED',
-  DELIVERY_CONFIRMATION = 'DELIVERY_CONFIRMATION',
-  DELAY_ALERT = 'DELAY_ALERT',
-  RFID_ANOMALY = 'RFID_ANOMALY',
-  EXPEDITION_PROBLEM = 'EXPEDITION_PROBLEM',
+  ALERTE_RETARD = 'ALERTE_RETARD',
+  ANOMALIE_RFID = 'ANOMALIE_RFID',
+  DIVERGENCE_RECEPTION = 'DIVERGENCE_RECEPTION',
+  CONFIRMATION_LIVRAISON = 'CONFIRMATION_LIVRAISON',
+  EXPEDITION_CREEE = 'EXPEDITION_CREEE',
+  EXPEDITION_DEPART = 'EXPEDITION_DEPART',
+  EXPEDITION_ARRIVEE = 'EXPEDITION_ARRIVEE',
+  PROBLEME_EXPEDITION = 'PROBLEME_EXPEDITION',
+  VALIDATION_REQUISE = 'VALIDATION_REQUISE',
+  RETOUR_PALETTE = 'RETOUR_PALETTE',
 }
 
 export enum NotificationChannel {
@@ -23,7 +27,7 @@ export enum NotificationStatus {
 }
 
 export interface Notification {
-  id: number;
+  id: string; // UUID
   type: NotificationType;
   channel: NotificationChannel;
   recipient_email?: string;
@@ -32,11 +36,11 @@ export interface Notification {
   message: string;
   status: NotificationStatus;
   sent_at?: string;
-  retry_count: number;
+  retry_count: string; // Backend uses string
   error_message?: string;
-  expedition_id?: number;
-  palette_id?: number;
-  user_id?: number;
+  expedition_id?: string; // UUID
+  palette_id?: string; // UUID
+  user_id?: string; // UUID
   created_at: string;
   updated_at: string;
 }
@@ -48,15 +52,16 @@ export interface NotificationCreate {
   recipient_phone?: string;
   subject?: string;
   message: string;
-  expedition_id?: number;
-  palette_id?: number;
-  user_id?: number;
+  expedition_id?: string; // UUID
+  palette_id?: string; // UUID
+  user_id?: string; // UUID
 }
 
 export interface NotificationSendEmail {
   to_email: string;
   subject: string;
   body: string;
+  is_html?: boolean;
 }
 
 export interface NotificationSendSMS {
@@ -65,9 +70,10 @@ export interface NotificationSendSMS {
 }
 
 export interface NotificationStatistics {
-  total: number;
-  by_status: Record<NotificationStatus, number>;
-  by_type: Record<NotificationType, number>;
-  by_channel: Record<NotificationChannel, number>;
+  total_notifications: number;
+  by_status: Record<string, number>;
+  by_type: Record<string, number>;
+  by_channel: Record<string, number>;
   success_rate: number;
+  failed_count: number;
 }

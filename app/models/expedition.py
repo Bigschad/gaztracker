@@ -216,6 +216,37 @@ class Expedition(Base, TimestampMixin):
         comment="User who validated the expedition"
     )
 
+    grossiste_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("partners.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Grossiste (partner) ID"
+    )
+
+    driver_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Driver (chauffeur) user ID"
+    )
+
+    contact_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("contacts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Contact ID (e.g., contact at grossiste, driver contact, etc.)"
+    )
+
+    # Libellé (label) for expedition
+    libelle = Column(
+        String(255),
+        nullable=True,
+        comment="Libellé (label) for the expedition"
+    )
+
     # Relationships
     created_by = relationship(
         "User",
@@ -227,6 +258,24 @@ class Expedition(Base, TimestampMixin):
         "User",
         back_populates="validated_expeditions",
         foreign_keys=[validated_by_id]
+    )
+
+    grossiste = relationship(
+        "Partner",
+        foreign_keys=[grossiste_id],
+        back_populates="expeditions"
+    )
+
+    driver = relationship(
+        "User",
+        foreign_keys=[driver_id],
+        remote_side="User.id"
+    )
+
+    contact = relationship(
+        "Contact",
+        foreign_keys=[contact_id],
+        remote_side="Contact.id"
     )
 
     palettes = relationship(

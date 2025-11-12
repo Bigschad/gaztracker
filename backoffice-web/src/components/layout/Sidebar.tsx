@@ -7,6 +7,9 @@ import {
   Bell,
   BarChart3,
   X,
+  Tag,
+  Building2,
+  UserCircle,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import clsx from 'clsx';
@@ -40,6 +43,11 @@ const navItems: NavItem[] = [
     icon: Truck,
   },
   {
+    name: 'Tags RFID',
+    path: '/rfid-tags',
+    icon: Tag,
+  },
+  {
     name: 'Utilisateurs',
     path: '/users',
     icon: Users,
@@ -54,6 +62,16 @@ const navItems: NavItem[] = [
     name: 'Rapports',
     path: '/reports',
     icon: BarChart3,
+  },
+  {
+    name: 'Partenaires',
+    path: '/partners',
+    icon: Building2,
+  },
+  {
+    name: 'Contacts',
+    path: '/contacts',
+    icon: UserCircle,
   },
 ];
 

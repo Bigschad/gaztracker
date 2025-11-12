@@ -39,6 +39,9 @@ class RFIDTag(Base, TimestampMixin):
     # Identifiant unique du tag RFID (fourni par le lecteur)
     tag_number = Column(String(50), unique=True, nullable=False, index=True)
 
+    # Libellé du tag (nom personnalisé)
+    label = Column(String(255), nullable=True, index=True)
+
     # Statut du tag
     status = Column(SQLEnum(RFIDTagStatus), default=RFIDTagStatus.NOT_ASSIGNED, nullable=False, index=True)
 
@@ -64,6 +67,11 @@ class RFIDTag(Base, TimestampMixin):
         """Marquer le tag comme assigné"""
         self.status = RFIDTagStatus.ASSIGNED
         self.assigned_at = datetime.utcnow()
+
+    def unassign_from_palette(self):
+        """Libérer le tag d'une palette"""
+        self.status = RFIDTagStatus.NOT_ASSIGNED
+        self.assigned_at = None
 
     def mark_as_lost(self):
         """Marquer le tag comme perdu"""

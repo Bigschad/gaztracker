@@ -229,6 +229,14 @@ app.include_router(notifications.router, prefix=f"{settings.API_V1_PREFIX}/notif
 from app.routes import reports
 app.include_router(reports.router, prefix=f"{settings.API_V1_PREFIX}/reports", tags=["Reports"])
 
+# Partners routes
+from app.routes import partners
+app.include_router(partners.router, prefix=f"{settings.API_V1_PREFIX}/partners", tags=["Partners"])
+
+# Contacts routes
+from app.routes import contacts
+app.include_router(contacts.router, prefix=f"{settings.API_V1_PREFIX}/contacts", tags=["Contacts"])
+
 
 # =============================================================================
 # Application Entry Point

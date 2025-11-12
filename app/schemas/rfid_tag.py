@@ -20,6 +20,7 @@ class RFIDTagBase(BaseModel):
     """Base RFID tag schema with common fields."""
 
     tag_number: str = Field(..., min_length=1, max_length=50, description="Unique RFID tag number")
+    label: Optional[str] = Field(None, max_length=255, description="Label/name for the RFID tag")
     notes: Optional[str] = Field(None, max_length=500, description="Additional notes")
 
 
@@ -43,6 +44,7 @@ class RFIDTagCreate(RFIDTagBase):
 class RFIDTagUpdate(BaseModel):
     """Schema for updating an existing RFID tag."""
 
+    label: Optional[str] = Field(None, max_length=255, description="Label/name for the RFID tag")
     status: Optional[RFIDTagStatus] = Field(None, description="Tag status")
     notes: Optional[str] = Field(None, max_length=500, description="Additional notes")
     is_active: Optional[bool] = Field(None, description="Active status")
@@ -66,6 +68,7 @@ class RFIDTagResponse(BaseModel):
 
     id: UUID = Field(..., description="Tag ID")
     tag_number: str = Field(..., description="RFID tag number")
+    label: Optional[str] = Field(None, description="Label/name for the RFID tag")
     status: RFIDTagStatus = Field(..., description="Tag status")
     created_by_id: UUID = Field(..., description="Creator user ID")
     is_active: bool = Field(..., description="Active status")
@@ -119,10 +122,11 @@ class RFIDTagDetailResponse(RFIDTagResponse):
 class RFIDTagListResponse(BaseModel):
     """Schema for paginated RFID tag list response."""
 
+    items: list[RFIDTagResponse] = Field(..., description="List of RFID tags")
     total: int = Field(..., description="Total number of tags")
     page: int = Field(..., description="Current page number")
     page_size: int = Field(..., description="Items per page")
-    tags: list[RFIDTagResponse] = Field(..., description="List of RFID tags")
+    total_pages: int = Field(..., description="Total number of pages")
     filters: dict = Field(default_factory=dict, description="Applied filters")
 
     model_config = ConfigDict(

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, status, Request, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from uuid import UUID
+import math
 
 from app.database import get_db
 from app.services.user_service import UserService
@@ -94,11 +95,14 @@ async def list_users(
         search=search
     )
 
+    total_pages = math.ceil(total / page_size) if total > 0 else 1
+
     return UserListResponse(
+        items=[UserResponse.model_validate(user) for user in users],
         total=total,
         page=page,
         page_size=page_size,
-        users=[UserResponse.model_validate(user) for user in users]
+        total_pages=total_pages
     )
 
 

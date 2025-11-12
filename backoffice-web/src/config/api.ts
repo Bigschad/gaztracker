@@ -19,16 +19,16 @@ export const API_ENDPOINTS = {
   // Users
   USERS: {
     BASE: '/api/v1/users',
-    BY_ID: (id: number) => `/api/v1/users/${id}`,
+    BY_ID: (id: string) => `/api/v1/users/${id}`,
     STATISTICS: '/api/v1/users/statistics',
   },
   // Palettes
   PALETTES: {
     BASE: '/api/v1/palettes',
-    BY_ID: (id: number) => `/api/v1/palettes/${id}`,
+    BY_ID: (id: string) => `/api/v1/palettes/${id}`,
     SCAN: '/api/v1/palettes/scan',
     STATISTICS: '/api/v1/palettes/statistics',
-    MOVEMENTS: (id: number) => `/api/v1/palettes/${id}/movements`,
+    MOVEMENTS: (id: string) => `/api/v1/palettes/${id}/movements`,
   },
   // Expeditions
   EXPEDITIONS: {
@@ -42,16 +42,26 @@ export const API_ENDPOINTS = {
   // Notifications
   NOTIFICATIONS: {
     BASE: '/api/v1/notifications',
-    BY_ID: (id: number) => `/api/v1/notifications/${id}`,
+    BY_ID: (id: string) => `/api/v1/notifications/${id}`,
     SEND_NOW: '/api/v1/notifications/send-now',
     SEND_EMAIL: '/api/v1/notifications/send-email',
     SEND_SMS: '/api/v1/notifications/send-sms',
-    SEND: (id: number) => `/api/v1/notifications/${id}/send`,
+    SEND: (id: string) => `/api/v1/notifications/${id}/send`,
     RETRY_FAILED: '/api/v1/notifications/retry/failed',
     STATISTICS: '/api/v1/notifications/statistics/overview',
     CHECK_DELAYS: '/api/v1/notifications/alerts/check-delays',
     CHECK_VALIDATIONS: '/api/v1/notifications/alerts/check-validations',
     RUN_ALL_CHECKS: '/api/v1/notifications/alerts/run-all',
+  },
+  // RFID Tags
+  RFID_TAGS: {
+    BASE: '/api/v1/rfid-tags',
+    BY_ID: (id: string) => `/api/v1/rfid-tags/${id}`,
+    BY_NUMBER: (tagNumber: string) => `/api/v1/rfid-tags/number/${tagNumber}`,
+    MARK_LOST: (id: string) => `/api/v1/rfid-tags/${id}/mark-lost`,
+    MARK_DAMAGED: (id: string) => `/api/v1/rfid-tags/${id}/mark-damaged`,
+    STATISTICS: '/api/v1/rfid-tags/statistics/summary',
+    BULK_IMPORT: '/api/v1/rfid-tags/bulk-import',
   },
   // Reports
   REPORTS: {
@@ -67,5 +77,15 @@ export const API_ENDPOINTS = {
     EXPORT_EXPEDITIONS: '/api/v1/reports/export/expeditions',
     EXPORT_PALETTES: '/api/v1/reports/export/palettes',
     QUICK_STATS: '/api/v1/reports/quick-stats',
+  },
+  // Partners
+  PARTNERS: {
+    BASE: '/api/v1/partners',
+    BY_ID: (id: string) => `/api/v1/partners/${id}`,
+  },
+  // Contacts
+  CONTACTS: {
+    BASE: '/api/v1/contacts',
+    BY_ID: (id: string) => `/api/v1/contacts/${id}`,
   },
 };

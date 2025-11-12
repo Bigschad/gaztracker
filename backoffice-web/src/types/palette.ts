@@ -1,5 +1,7 @@
 // Palette types matching backend schemas
 
+import { RFIDTag } from './rfidTag';
+
 export enum PaletteType {
   B6 = 'B6',
   B12 = 'B12',
@@ -7,42 +9,56 @@ export enum PaletteType {
 }
 
 export enum PaletteStatus {
-  CREATED = 'CREATED',
-  IN_STOCK = 'IN_STOCK',
-  ASSIGNED = 'ASSIGNED',
-  IN_TRANSIT = 'IN_TRANSIT',
-  DELIVERED = 'DELIVERED',
-  RETURNED = 'RETURNED',
-  MAINTENANCE = 'MAINTENANCE',
-  LOST = 'LOST',
+  CREATION = 'CREATION',
+  EN_STOCK = 'EN_STOCK',
+  EN_ROUTE = 'EN_ROUTE',
+  EN_RECEPTION = 'EN_RECEPTION',
+  LIVREE = 'LIVREE',
+  RETOURNEE = 'RETOURNEE',
+  OUT = 'OUT',
 }
 
 export interface Palette {
-  id: number;
-  rfid_tag: string;
-  palette_type: PaletteType;
-  bottle_quantity: number;
+  id: string; // UUID
+  serial_number: string; // Numéro de série unique (PAL-YYYY-NNNNN)
+  reference_code?: string | null; // Code de référence personnalisé
+  rfid_tag_id?: string | null; // UUID
+  rfid_tag?: RFIDTag | null; // Tag RFID complet
+  type: PaletteType;
+  capacity?: number | null; // Capacité en nombre de bouteilles possibles
+  manufacturing_date?: string | null; // Date de fabrication
   status: PaletteStatus;
-  current_location?: string;
-  assigned_to?: number;
-  expedition_id?: number;
-  notes?: string;
-  created_by: number;
+  current_partner_id?: string | null; // UUID du partenaire (grossiste) actuel
+  location_latitude?: number | null;
+  location_longitude?: number | null;
+  location_address?: string | null;
+  notes?: string | null;
+  created_by_id?: string; // UUID
+  current_expedition_id?: string | null; // UUID
   created_at: string;
   updated_at: string;
-  is_deleted: boolean;
 }
 
 export interface PaletteCreate {
-  palette_type: PaletteType;
-  bottle_quantity: number;
-  current_location?: string;
+  type: PaletteType;
+  reference_code?: string; // Code de référence personnalisé
+  capacity?: number; // Capacité en nombre de bouteilles possibles
+  manufacturing_date?: string; // Date de fabrication (format ISO date)
+  rfid_tag_id?: string; // UUID du tag RFID (optionnel, peut être ajouté plus tard)
+  current_partner_id?: string; // UUID du partenaire (grossiste) actuel
+  location_latitude?: number;
+  location_longitude?: number;
+  location_address?: string;
   notes?: string;
 }
 
 export interface PaletteUpdate {
+  type?: PaletteType;
   status?: PaletteStatus;
-  current_location?: string;
+  rfid_tag_id?: string; // Permet de réassigner un tag RFID
+  location_latitude?: number;
+  location_longitude?: number;
+  location_address?: string;
   notes?: string;
 }
 
