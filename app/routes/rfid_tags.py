@@ -4,14 +4,15 @@ RFID Tags Routes
 API endpoints for RFID tag management.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File
 from sqlalchemy.orm import Session
 from uuid import UUID
 from typing import Optional
 import logging
+import math
 
-from app.database import get_db
-from app.middleware.auth_middleware import get_current_user
+from app.database import get_sync_db
+from app.middleware.auth_middleware import get_current_user_sync
 from app.models.user import User, UserRole
 from app.models.rfid_tag import RFIDTagStatus
 from app.schemas.rfid_tag import (
@@ -34,7 +35,7 @@ router = APIRouter()
 
 
 @router.post(
-    "/",
+    "",
     response_model=RFIDTagResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a new RFID tag",
@@ -54,8 +55,8 @@ router = APIRouter()
 )
 async def create_rfid_tag(
     tag_create: RFIDTagCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_sync_db),
+    current_user: User = Depends(get_current_user_sync),
 ):
     """Create a new RFID tag."""
     try:
@@ -83,45 +84,6 @@ async def create_rfid_tag(
 
 
 @router.get(
-    "/{tag_id}",
-    response_model=RFIDTagDetailResponse,
-    summary="Get RFID tag by ID",
-    description="Retrieve detailed information about a specific RFID tag.",
-    responses={
-        200: {"description": "RFID tag found"},
-        404: {"description": "RFID tag not found"},
-    },
-)
-async def get_rfid_tag(
-    tag_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Get an RFID tag by ID."""
-    try:
-        tag = RFIDTagService.get_rfid_tag(db, tag_id)
-
-        # Add palette_id if tag is assigned
-        response_data = RFIDTagDetailResponse.model_validate(tag)
-        if tag.palette:
-            response_data.palette_id = tag.palette.id
-
-        return response_data
-
-    except ResourceNotFoundException as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except Exception as e:
-        logger.error(f"Error retrieving RFID tag: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
-        )
-
-
-@router.get(
     "/number/{tag_number}",
     response_model=RFIDTagDetailResponse,
     summary="Get RFID tag by number",
@@ -133,8 +95,8 @@ async def get_rfid_tag(
 )
 async def get_rfid_tag_by_number(
     tag_number: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_sync_db),
+    current_user: User = Depends(get_current_user_sync),
 ):
     """Get an RFID tag by its tag number (for scanning)."""
     try:
@@ -161,7 +123,30 @@ async def get_rfid_tag_by_number(
 
 
 @router.get(
-    "/",
+    "/statistics/summary",
+    response_model=RFIDTagStatistics,
+    summary="Get RFID tag statistics",
+    description="Get aggregated statistics about all RFID tags in the system.",
+)
+async def get_rfid_tag_statistics(
+    db: Session = Depends(get_sync_db),
+    current_user: User = Depends(get_current_user_sync),
+):
+    """Get RFID tag statistics."""
+    try:
+        stats = RFIDTagService.get_tag_statistics(db)
+        return RFIDTagStatistics(**stats)
+
+    except Exception as e:
+        logger.error(f"Error getting RFID tag statistics: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        )
+
+
+@router.get(
+    "",
     response_model=RFIDTagListResponse,
     summary="List RFID tags",
     description="""
@@ -175,36 +160,89 @@ async def get_rfid_tag_by_number(
     """,
 )
 async def list_rfid_tags(
-    status: Optional[RFIDTagStatus] = Query(None, description="Filter by tag status"),
+    status: Optional[str] = Query(None, description="Filter by tag status (NOT_ASSIGNED, ASSIGNED, LOST, DAMAGED)"),
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_sync_db),
+    current_user: User = Depends(get_current_user_sync),
 ):
     """List RFID tags with filters and pagination."""
     try:
+        # Convert string status to enum if provided
+        status_enum = None
+        if status:
+            try:
+                status_enum = RFIDTagStatus(status.upper())
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Invalid status value: {status}. Must be one of: NOT_ASSIGNED, ASSIGNED, LOST, DAMAGED"
+                )
+        
         tags, total = RFIDTagService.list_rfid_tags(
             db,
-            status=status,
+            status=status_enum,
             is_active=is_active,
             page=page,
             page_size=page_size,
         )
 
+        total_pages = math.ceil(total / page_size) if total > 0 else 1
+
         return RFIDTagListResponse(
+            items=tags,
             total=total,
             page=page,
             page_size=page_size,
-            tags=tags,
+            total_pages=total_pages,
             filters={
-                "status": status.value if status else None,
+                "status": status_enum.value if status_enum else None,
                 "is_active": is_active,
             },
         )
 
     except Exception as e:
         logger.error(f"Error listing RFID tags: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        )
+
+
+@router.get(
+    "/{tag_id}",
+    response_model=RFIDTagDetailResponse,
+    summary="Get RFID tag by ID",
+    description="Retrieve detailed information about a specific RFID tag.",
+    responses={
+        200: {"description": "RFID tag found"},
+        404: {"description": "RFID tag not found"},
+    },
+)
+async def get_rfid_tag(
+    tag_id: UUID,
+    db: Session = Depends(get_sync_db),
+    current_user: User = Depends(get_current_user_sync),
+):
+    """Get an RFID tag by ID."""
+    try:
+        tag = RFIDTagService.get_rfid_tag(db, tag_id)
+
+        # Add palette_id if tag is assigned
+        response_data = RFIDTagDetailResponse.model_validate(tag)
+        if tag.palette:
+            response_data.palette_id = tag.palette.id
+
+        return response_data
+
+    except ResourceNotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Error retrieving RFID tag: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -235,8 +273,8 @@ async def list_rfid_tags(
 async def update_rfid_tag(
     tag_id: UUID,
     tag_update: RFIDTagUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_sync_db),
+    current_user: User = Depends(get_current_user_sync),
 ):
     """Update an RFID tag."""
     try:
@@ -274,8 +312,8 @@ async def update_rfid_tag(
 async def mark_tag_as_lost(
     tag_id: UUID,
     notes: Optional[str] = Query(None, description="Notes about the loss"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_sync_db),
+    current_user: User = Depends(get_current_user_sync),
 ):
     """Mark an RFID tag as lost."""
     try:
@@ -308,8 +346,8 @@ async def mark_tag_as_lost(
 async def mark_tag_as_damaged(
     tag_id: UUID,
     notes: Optional[str] = Query(None, description="Notes about the damage"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_sync_db),
+    current_user: User = Depends(get_current_user_sync),
 ):
     """Mark an RFID tag as damaged."""
     try:
@@ -332,15 +370,16 @@ async def mark_tag_as_damaged(
 @router.delete(
     "/{tag_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete RFID tag",
+    summary="Delete RFID tag permanently",
     description="""
-    Delete an RFID tag (soft delete).
+    Permanently delete an RFID tag (hard delete).
 
     **Restrictions**:
     - Cannot delete tags that are ASSIGNED to a palette
     - Only ADMIN users can delete tags
+    - Only tags with status NOT_ASSIGNED can be deleted
 
-    The tag will be marked as inactive rather than physically deleted.
+    **Warning**: This action cannot be undone!
     """,
     responses={
         204: {"description": "Tag deleted successfully"},
@@ -351,16 +390,16 @@ async def mark_tag_as_damaged(
 )
 async def delete_rfid_tag(
     tag_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_sync_db),
+    current_user: User = Depends(get_current_user_sync),
 ):
-    """Delete an RFID tag (soft delete)."""
+    """Permanently delete an RFID tag (hard delete)."""
     try:
         # Only admin can delete tags
         if current_user.role != UserRole.ADMIN:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only ADMIN users can delete RFID tags",
+                detail="Seuls les administrateurs peuvent supprimer définitivement les tags RFID",
             )
 
         RFIDTagService.delete_rfid_tag(db, tag_id)
@@ -369,12 +408,12 @@ async def delete_rfid_tag(
     except ResourceNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
+            detail=e.message if hasattr(e, 'message') else str(e),
         )
     except ValidationException as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail=e.message if hasattr(e, 'message') else str(e),
         )
     except Exception as e:
         logger.error(f"Error deleting RFID tag: {str(e)}")
@@ -384,24 +423,72 @@ async def delete_rfid_tag(
         )
 
 
-@router.get(
-    "/statistics/summary",
-    response_model=RFIDTagStatistics,
-    summary="Get RFID tag statistics",
-    description="Get aggregated statistics about all RFID tags in the system.",
-)
-async def get_rfid_tag_statistics(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Get RFID tag statistics."""
-    try:
-        stats = RFIDTagService.get_tag_statistics(db)
-        return RFIDTagStatistics(**stats)
+@router.post(
+    "/bulk-import",
+    status_code=status.HTTP_200_OK,
+    summary="Bulk import RFID tags from CSV",
+    description="""
+    Import multiple RFID tags from a CSV file.
 
+    **CSV Format:**
+    - Required column: tag_number
+    - Optional column: notes
+    - First row must be the header
+
+    **Example CSV:**
+    ```
+    tag_number,notes
+    RFID-2024-001,Tag from batch A
+    RFID-2024-002,Tag from batch B
+    ```
+
+    **Authorized roles**: ADMIN, OPERATEUR_USINE
+    """,
+    responses={
+        200: {"description": "Import completed (may include errors)"},
+        400: {"description": "Invalid CSV format"},
+        401: {"description": "Unauthorized"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
+async def bulk_import_rfid_tags(
+    file: UploadFile = File(..., description="CSV file to import"),
+    db: Session = Depends(get_sync_db),
+    current_user: User = Depends(get_current_user_sync),
+):
+    """Import RFID tags in bulk from a CSV file."""
+    try:
+        # Verify permissions
+        if current_user.role not in [UserRole.ADMIN, UserRole.OPERATEUR_USINE]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only ADMIN or OPERATEUR_USINE can import RFID tags",
+            )
+
+        # Verify file is CSV
+        if not file.filename.endswith('.csv'):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File must be a CSV file",
+            )
+
+        # Read file content
+        content = await file.read()
+        csv_content = content.decode('utf-8')
+
+        # Process import
+        result = RFIDTagService.bulk_import_tags(db, csv_content, current_user)
+
+        return result
+
+    except ValidationException as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
     except Exception as e:
-        logger.error(f"Error getting RFID tag statistics: {str(e)}")
+        logger.error(f"Error during bulk import: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
+            detail="Internal server error during import",
         )

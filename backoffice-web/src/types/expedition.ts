@@ -37,13 +37,17 @@ export interface Expedition {
 }
 
 export interface ExpeditionCreate {
-  destination: string;
-  destination_contact: string;
-  destination_phone: string;
-  grossiste_id?: number;
-  expected_delivery_date?: string;
+  destination_address: string;
+  destination_contact?: string;
+  destination_phone?: string;
+  transporter?: string;
+  vehicle_info?: string;
+  libelle?: string;
+  grossiste_id?: string;
+  driver_id?: string;
+  eta?: string;
   notes?: string;
-  palette_ids?: number[];
+  palette_ids?: string[];
 }
 
 export interface ExpeditionUpdate {

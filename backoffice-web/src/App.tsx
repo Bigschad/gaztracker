@@ -12,9 +12,18 @@ import CreatePalettePage from './pages/palettes/CreatePalettePage';
 import ExpeditionsListPage from './pages/expeditions/ExpeditionsListPage';
 import ExpeditionDetailsPage from './pages/expeditions/ExpeditionDetailsPage';
 import CreateExpeditionPage from './pages/expeditions/CreateExpeditionPage';
+import RFIDTagsListPage from './pages/rfidTags/RFIDTagsListPage';
 import UsersListPage from './pages/users/UsersListPage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
 import ReportsPage from './pages/reports/ReportsPage';
+import PartnersListPage from './pages/partners/PartnersListPage';
+import CreatePartnerPage from './pages/partners/CreatePartnerPage';
+import EditPartnerPage from './pages/partners/EditPartnerPage';
+import PartnerDetailsPage from './pages/partners/PartnerDetailsPage';
+import ContactsListPage from './pages/contacts/ContactsListPage';
+import CreateContactPage from './pages/contacts/CreateContactPage';
+import EditContactPage from './pages/contacts/EditContactPage';
+import ContactDetailsPage from './pages/contacts/ContactDetailsPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 function App() {
@@ -47,6 +56,9 @@ function App() {
             <Route path="expeditions/new" element={<CreateExpeditionPage />} />
             <Route path="expeditions/:id" element={<ExpeditionDetailsPage />} />
 
+            {/* RFID Tags */}
+            <Route path="rfid-tags" element={<RFIDTagsListPage />} />
+
             {/* Users (Admin only) */}
             <Route path="users" element={<UsersListPage />} />
 
@@ -55,6 +67,18 @@ function App() {
 
             {/* Reports */}
             <Route path="reports" element={<ReportsPage />} />
+
+            {/* Partners */}
+            <Route path="partners" element={<PartnersListPage />} />
+            <Route path="partners/new" element={<CreatePartnerPage />} />
+            <Route path="partners/:id" element={<PartnerDetailsPage />} />
+            <Route path="partners/:id/edit" element={<EditPartnerPage />} />
+
+            {/* Contacts */}
+            <Route path="contacts" element={<ContactsListPage />} />
+            <Route path="contacts/new" element={<CreateContactPage />} />
+            <Route path="contacts/:id" element={<ContactDetailsPage />} />
+            <Route path="contacts/:id/edit" element={<EditContactPage />} />
           </Route>
 
           {/* 404 */}

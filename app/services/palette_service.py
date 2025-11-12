@@ -10,6 +10,7 @@ from uuid import UUID
 from datetime import datetime
 from typing import Optional, Tuple, List
 import logging
+import re
 
 from app.models.palette import Palette, PaletteStatus, PaletteType
 from app.models.palette_movement import PaletteMovement, MovementAction
@@ -31,19 +32,59 @@ class PaletteService:
     """Service for managing palettes."""
 
     @staticmethod
+    def _generate_serial_number(db: Session) -> str:
+        """
+        Generate a unique serial number for a new palette.
+
+        Format: PAL-YYYY-NNNNN where:
+        - PAL: Prefix for palette
+        - YYYY: Current year
+        - NNNNN: Sequential number (5 digits, zero-padded)
+
+        Args:
+            db: Database session
+
+        Returns:
+            Generated serial number (e.g., "PAL-2025-00001")
+        """
+        current_year = datetime.now().year
+        prefix = f"PAL-{current_year}-"
+
+        # Find the latest serial number for the current year
+        latest_palette = db.query(Palette).filter(
+            Palette.serial_number.like(f"{prefix}%")
+        ).order_by(Palette.serial_number.desc()).first()
+
+        if latest_palette and latest_palette.serial_number:
+            # Extract the counter from the last serial number
+            match = re.search(r'PAL-\d{4}-(\d{5})', latest_palette.serial_number)
+            if match:
+                counter = int(match.group(1)) + 1
+            else:
+                counter = 1
+        else:
+            counter = 1
+
+        # Generate the new serial number with zero-padding
+        serial_number = f"{prefix}{counter:05d}"
+
+        return serial_number
+
+    @staticmethod
     def create_palette(
         db: Session,
         palette_create: PaletteCreate,
         current_user: User
     ) -> Palette:
         """
-        Create a new palette and attach an RFID tag.
+        Create a new palette and optionally attach an RFID tag.
 
         Process:
-        1. Verify RFID tag exists and is NOT_ASSIGNED
-        2. Create the palette
-        3. Assign the RFID tag to the palette
-        4. Create initial movement history entry
+        1. Generate unique serial number
+        2. If RFID tag provided: verify it exists and is NOT_ASSIGNED
+        3. Create the palette
+        4. If RFID tag provided: assign it to the palette
+        5. Create initial movement history entry
 
         Args:
             db: Database session
@@ -57,25 +98,38 @@ class PaletteService:
             ResourceNotFoundException: If RFID tag not found
             ValidationException: If RFID tag is not assignable
         """
-        # Get and validate RFID tag
-        tag = RFIDTagService.get_rfid_tag(db, palette_create.rfid_tag_id)
+        tag = None
+        tag_number = None
 
-        if not tag.is_assignable:
-            raise ValidationException(
-                message=f"RFID tag must be NOT_ASSIGNED and active (current status: {tag.status})",
-                details={
-                    "tag_id": str(tag.id),
-                    "tag_number": tag.tag_number,
-                    "status": tag.status.value,
-                    "is_active": tag.is_active
-                }
-            )
+        # Get and validate RFID tag if provided
+        if palette_create.rfid_tag_id:
+            tag = RFIDTagService.get_rfid_tag(db, palette_create.rfid_tag_id)
+
+            if not tag.is_assignable:
+                raise ValidationException(
+                    message=f"RFID tag must be NOT_ASSIGNED and active (current status: {tag.status})",
+                    details={
+                        "tag_id": str(tag.id),
+                        "tag_number": tag.tag_number,
+                        "status": tag.status.value,
+                        "is_active": tag.is_active
+                    }
+                )
+            tag_number = tag.tag_number
+
+        # Generate unique serial number
+        serial_number = PaletteService._generate_serial_number(db)
 
         # Create the palette
         new_palette = Palette(
+            serial_number=serial_number,
+            reference_code=palette_create.reference_code,
             type=palette_create.type,
+            capacity=palette_create.capacity,
+            manufacturing_date=palette_create.manufacturing_date,
             status=PaletteStatus.CREATION,
-            rfid_tag_id=tag.id,
+            rfid_tag_id=tag.id if tag else None,
+            current_partner_id=palette_create.current_partner_id,
             location_latitude=palette_create.location_latitude,
             location_longitude=palette_create.location_longitude,
             location_address=palette_create.location_address,
@@ -83,30 +137,39 @@ class PaletteService:
             created_by_id=current_user.id
         )
 
-        # Assign the RFID tag
-        tag.assign_to_palette()
-
         db.add(new_palette)
-        db.add(tag)
+
+        # Assign the RFID tag if provided
+        if tag:
+            tag.assign_to_palette()
+            db.add(tag)
+
         db.flush()
 
         # Create initial movement history
+        notes_text = f"Palette created with RFID tag {tag_number}" if tag_number else "Palette created without RFID tag"
         movement = PaletteMovement(
             palette_id=new_palette.id,
-            action=MovementAction.CREATED,
+            action=MovementAction.CREATION,
             status_before=None,
             status_after=PaletteStatus.CREATION,
-            performed_by_id=current_user.id,
-            notes=f"Palette created with RFID tag {tag.tag_number}",
-            location_latitude=palette_create.location_latitude,
-            location_longitude=palette_create.location_longitude
+            user_id=current_user.id,
+            notes=notes_text,
+            latitude=palette_create.location_latitude,
+            longitude=palette_create.location_longitude
         )
         db.add(movement)
 
         db.commit()
         db.refresh(new_palette)
 
-        logger.info(f"Palette created: {new_palette.id} with RFID tag {tag.tag_number}")
+        log_msg = f"Palette created: {new_palette.serial_number} (ID: {new_palette.id})"
+        if tag_number:
+            log_msg += f" with RFID tag {tag_number}"
+        else:
+            log_msg += " without RFID tag"
+        logger.info(log_msg)
+
         return new_palette
 
     @staticmethod
@@ -130,7 +193,8 @@ class PaletteService:
         if include_relations:
             query = query.options(
                 joinedload(Palette.rfid_tag),
-                joinedload(Palette.created_by)
+                joinedload(Palette.created_by),
+                joinedload(Palette.current_partner)
             )
 
         palette = query.filter(Palette.id == palette_id).first()
@@ -162,7 +226,8 @@ class PaletteService:
             RFIDTag.tag_number == rfid_tag_number
         ).options(
             joinedload(Palette.rfid_tag),
-            joinedload(Palette.created_by)
+            joinedload(Palette.created_by),
+            joinedload(Palette.current_partner)
         ).first()
 
         if not palette:
@@ -201,7 +266,8 @@ class PaletteService:
         """
         query = db.query(Palette).options(
             joinedload(Palette.rfid_tag),
-            joinedload(Palette.created_by)
+            joinedload(Palette.created_by),
+            joinedload(Palette.current_partner)
         )
 
         # Apply filters
@@ -251,13 +317,37 @@ class PaletteService:
         Raises:
             ResourceNotFoundException: If palette not found
             InvalidStatusTransitionException: If status transition is invalid
+            ValidationException: If RFID tag cannot be assigned
         """
         palette = PaletteService.get_palette(db, palette_id)
         old_status = palette.status
+        old_rfid_tag = palette.rfid_tag
 
         # Validate status transition if status is being updated
         if palette_update.status and palette_update.status != old_status:
             PaletteService._validate_status_transition(palette, palette_update.status)
+
+        # Handle RFID tag reassignment if requested
+        if palette_update.rfid_tag_id is not None:
+            # Get the new tag and validate it
+            new_tag = RFIDTagService.get_rfid_tag(db, palette_update.rfid_tag_id)
+
+            if not new_tag.is_assignable:
+                raise ValidationException(
+                    f"RFID tag {new_tag.tag_number} is not assignable. "
+                    f"Status: {new_tag.status}, Active: {new_tag.is_active}"
+                )
+
+            # If palette already has a tag, unassign it first
+            if old_rfid_tag:
+                old_rfid_tag.unassign_from_palette()
+                db.add(old_rfid_tag)
+                logger.info(f"Unassigned old RFID tag {old_rfid_tag.tag_number} from palette {palette_id}")
+
+            # Assign the new tag
+            new_tag.assign_to_palette()
+            db.add(new_tag)
+            logger.info(f"Assigned new RFID tag {new_tag.tag_number} to palette {palette_id}")
 
         # Apply updates
         update_data = palette_update.model_dump(exclude_unset=True)
@@ -277,6 +367,18 @@ class PaletteService:
                 notes=f"Status changed from {old_status.value} to {palette_update.status.value}",
                 location_latitude=palette_update.location_latitude,
                 location_longitude=palette_update.location_longitude
+            )
+            db.add(movement)
+
+        # Create movement if RFID tag changed
+        if palette_update.rfid_tag_id is not None and old_rfid_tag:
+            movement = PaletteMovement(
+                palette_id=palette_id,
+                action=MovementAction.STATUS_CHANGED,
+                status_before=old_status,
+                status_after=palette.status,
+                performed_by_id=current_user.id,
+                notes=f"RFID tag reassigned from {old_rfid_tag.tag_number} to {palette.rfid_tag.tag_number}",
             )
             db.add(movement)
 

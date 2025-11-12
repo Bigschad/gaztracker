@@ -71,14 +71,19 @@ export const getStatusColor = (status: string): string => {
 
   const colorMap: Record<string, string> = {
     // Palette statuses
-    CREATED: 'text-blue-600 bg-blue-100',
-    IN_STOCK: 'text-green-600 bg-green-100',
-    ASSIGNED: 'text-yellow-600 bg-yellow-100',
-    IN_TRANSIT: 'text-purple-600 bg-purple-100',
-    DELIVERED: 'text-green-600 bg-green-100',
-    RETURNED: 'text-gray-600 bg-gray-100',
-    MAINTENANCE: 'text-orange-600 bg-orange-100',
+    CREATION: 'text-blue-600 bg-blue-100',
+    EN_STOCK: 'text-green-600 bg-green-100',
+    EN_ROUTE: 'text-purple-600 bg-purple-100',
+    EN_RECEPTION: 'text-yellow-600 bg-yellow-100',
+    LIVREE: 'text-green-600 bg-green-100',
+    RETOURNEE: 'text-gray-600 bg-gray-100',
+    OUT: 'text-red-600 bg-red-100',
+    
+    // RFID Tag statuses
+    NOT_ASSIGNED: 'text-gray-600 bg-gray-100',
+    ASSIGNED: 'text-green-600 bg-green-100',
     LOST: 'text-red-600 bg-red-100',
+    DAMAGED: 'text-orange-600 bg-orange-100',
 
     // Expedition statuses
     VALIDATED: 'text-blue-600 bg-blue-100',

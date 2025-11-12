@@ -19,7 +19,7 @@ export const reportService = {
   },
 
   // Get performance report
-  getPerformanceReport: async (params?: DateRange): Promise<PerformanceReport> => {
+  getPerformanceReport: async (params?: { days?: number; start_date?: string; end_date?: string }): Promise<PerformanceReport> => {
     const response = await apiClient.get<PerformanceReport>(
       API_ENDPOINTS.REPORTS.PERFORMANCE,
       { params }

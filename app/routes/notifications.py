@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 from uuid import UUID
+import math
 
 from app.database import get_db
 from app.models.user import User
@@ -199,11 +200,14 @@ async def list_notifications(
         page_size=page_size
     )
 
+    total_pages = math.ceil(total / page_size) if total > 0 else 1
+
     return NotificationListResponse(
+        items=notifications,
         total=total,
         page=page,
         page_size=page_size,
-        notifications=notifications
+        total_pages=total_pages
     )
 
 

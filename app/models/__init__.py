@@ -11,6 +11,8 @@ from app.models.expedition import Expedition, ExpeditionStatus
 from app.models.palette_movement import PaletteMovement, MovementAction
 from app.models.notification import Notification, NotificationType, NotificationStatus, NotificationChannel
 from app.models.audit import AuditLog
+from app.models.partner import Partner, PartnerType
+from app.models.contact import Contact
 
 
 __all__ = [
@@ -22,6 +24,8 @@ __all__ = [
     "PaletteMovement",
     "Notification",
     "AuditLog",
+    "Partner",
+    "Contact",
 
     # Enums
     "UserRole",
@@ -33,4 +37,5 @@ __all__ = [
     "NotificationType",
     "NotificationStatus",
     "NotificationChannel",
+    "PartnerType",
 ]

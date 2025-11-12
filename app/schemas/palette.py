@@ -4,7 +4,7 @@ Palette Schemas
 Pydantic schemas for Palette model validation and serialization.
 """
 
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict
 from uuid import UUID
@@ -21,6 +21,9 @@ class PaletteBase(BaseModel):
     """Base palette schema with common fields."""
 
     type: PaletteType = Field(..., description="Type of gas bottles (B6, B12, B28)")
+    reference_code: Optional[str] = Field(None, max_length=50, description="Code de référence personnalisé")
+    capacity: Optional[int] = Field(None, ge=1, description="Capacité en nombre de bouteilles possibles")
+    manufacturing_date: Optional[date] = Field(None, description="Date de fabrication")
     notes: Optional[str] = Field(None, max_length=1000, description="Additional notes")
 
 
@@ -31,7 +34,8 @@ class PaletteBase(BaseModel):
 class PaletteCreate(PaletteBase):
     """Schema for creating a new palette."""
 
-    rfid_tag_id: UUID = Field(..., description="ID of the RFID tag to attach (must be NOT_ASSIGNED)")
+    rfid_tag_id: Optional[UUID] = Field(None, description="ID of the RFID tag to attach (must be NOT_ASSIGNED). Can be added later.")
+    current_partner_id: Optional[UUID] = Field(None, description="ID du partenaire (grossiste) chez qui se trouve la palette")
     location_latitude: Optional[float] = Field(None, ge=-90, le=90, description="GPS latitude")
     location_longitude: Optional[float] = Field(None, ge=-180, le=180, description="GPS longitude")
     location_address: Optional[str] = Field(None, max_length=500, description="Physical address")
@@ -53,7 +57,12 @@ class PaletteUpdate(BaseModel):
     """Schema for updating an existing palette."""
 
     type: Optional[PaletteType] = Field(None, description="Type of gas bottles")
+    reference_code: Optional[str] = Field(None, max_length=50, description="Code de référence personnalisé")
+    capacity: Optional[int] = Field(None, ge=1, description="Capacité en nombre de bouteilles possibles")
+    manufacturing_date: Optional[date] = Field(None, description="Date de fabrication")
     status: Optional[PaletteStatus] = Field(None, description="Palette status")
+    rfid_tag_id: Optional[UUID] = Field(None, description="ID of new RFID tag to assign (must be NOT_ASSIGNED)")
+    current_partner_id: Optional[UUID] = Field(None, description="ID du partenaire (grossiste) chez qui se trouve la palette")
     notes: Optional[str] = Field(None, max_length=1000, description="Additional notes")
     location_latitude: Optional[float] = Field(None, ge=-90, le=90, description="GPS latitude")
     location_longitude: Optional[float] = Field(None, ge=-180, le=180, description="GPS longitude")
@@ -115,9 +124,11 @@ class PaletteResponse(PaletteBase):
     """Schema for palette response."""
 
     id: UUID = Field(..., description="Palette ID")
+    serial_number: str = Field(..., description="Human-readable serial number (e.g., PAL-2025-00001)")
     rfid_tag_id: Optional[UUID] = Field(None, description="RFID tag ID")
     rfid_tag: Optional[RFIDTagResponse] = Field(None, description="RFID tag details")
     status: PaletteStatus = Field(..., description="Current status")
+    current_partner_id: Optional[UUID] = Field(None, description="Current partner (grossiste) ID")
     location_latitude: Optional[float] = Field(None, description="GPS latitude")
     location_longitude: Optional[float] = Field(None, description="GPS longitude")
     location_address: Optional[str] = Field(None, description="Physical address")
@@ -131,6 +142,7 @@ class PaletteResponse(PaletteBase):
         json_schema_extra={
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174000",
+                "serial_number": "PAL-2025-00001",
                 "rfid_tag_id": "550e8400-e29b-41d4-a716-446655440000",
                 "rfid_tag": {
                     "id": "550e8400-e29b-41d4-a716-446655440000",
@@ -183,6 +195,7 @@ class PaletteListResponse(BaseModel):
                 "palettes": [
                     {
                         "id": "123e4567-e89b-12d3-a456-426614174000",
+                        "serial_number": "PAL-2025-00001",
                         "rfid_tag": "GAZ123456789",
                         "type": "B12",
                         "status": "EN_STOCK",
@@ -215,6 +228,7 @@ class PaletteScanResponse(BaseModel):
                 "message": "Palette scannée avec succès",
                 "palette": {
                     "id": "123e4567-e89b-12d3-a456-426614174000",
+                    "serial_number": "PAL-2025-00001",
                     "rfid_tag": "GAZ123456789",
                     "type": "B12",
                     "status": "EN_ROUTE",

@@ -25,6 +25,7 @@ class ExpeditionBase(BaseModel):
     transporter: Optional[str] = Field(None, max_length=255, description="Transport company/driver")
     vehicle_info: Optional[str] = Field(None, max_length=255, description="Vehicle information")
     notes: Optional[str] = Field(None, max_length=1000, description="Additional notes")
+    libelle: Optional[str] = Field(None, max_length=255, description="Libellé (label) for the expedition")
 
 
 # =============================================================================
@@ -36,6 +37,9 @@ class ExpeditionCreate(ExpeditionBase):
 
     eta: Optional[datetime] = Field(None, description="Estimated time of arrival")
     palette_ids: list[UUID] = Field(default_factory=list, description="List of palette IDs")
+    grossiste_id: Optional[UUID] = Field(None, description="Grossiste (partner) ID")
+    driver_id: Optional[UUID] = Field(None, description="Driver (chauffeur) user ID")
+    contact_id: Optional[UUID] = Field(None, description="Contact ID (e.g., contact at grossiste, driver contact, etc.)")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -47,7 +51,11 @@ class ExpeditionCreate(ExpeditionBase):
                 "vehicle_info": "Camion AB-123-CD",
                 "eta": "2024-01-20T14:00:00Z",
                 "notes": "Livraison urgente",
-                "palette_ids": ["123e4567-e89b-12d3-a456-426614174000"]
+                "libelle": "Expédition urgente janvier 2024",
+                "palette_ids": ["123e4567-e89b-12d3-a456-426614174000"],
+                "grossiste_id": "123e4567-e89b-12d3-a456-426614174001",
+                "driver_id": "123e4567-e89b-12d3-a456-426614174002",
+                "contact_id": "123e4567-e89b-12d3-a456-426614174003"
             }
         }
     )
@@ -65,6 +73,10 @@ class ExpeditionUpdate(BaseModel):
     eta: Optional[datetime] = Field(None, description="Estimated time of arrival")
     notes: Optional[str] = Field(None, max_length=1000, description="Additional notes")
     problem_description: Optional[str] = Field(None, max_length=1000, description="Problem description")
+    libelle: Optional[str] = Field(None, max_length=255, description="Libellé (label) for the expedition")
+    grossiste_id: Optional[UUID] = Field(None, description="Grossiste (partner) ID")
+    driver_id: Optional[UUID] = Field(None, description="Driver (chauffeur) user ID")
+    contact_id: Optional[UUID] = Field(None, description="Contact ID")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -128,6 +140,9 @@ class ExpeditionResponse(ExpeditionBase):
     problem_description: Optional[str] = Field(None, description="Problem description")
     created_by_id: Optional[UUID] = Field(None, description="Creator user ID")
     validated_by_id: Optional[UUID] = Field(None, description="Validator user ID")
+    grossiste_id: Optional[UUID] = Field(None, description="Grossiste (partner) ID")
+    driver_id: Optional[UUID] = Field(None, description="Driver (chauffeur) user ID")
+    contact_id: Optional[UUID] = Field(None, description="Contact ID")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
 

@@ -9,33 +9,38 @@ export enum UserRole {
 }
 
 export interface User {
-  id: number;
-  username: string;
+  id: string; // UUID
   email: string;
-  full_name: string;
+  first_name: string;
+  last_name: string;
+  phone_number?: string;
+  company_name?: string;
   role: UserRole;
-  phone?: string;
   is_active: boolean;
+  is_verified: boolean;
   created_at: string;
   updated_at: string;
-  last_login?: string;
 }
 
 export interface UserCreate {
-  username: string;
   email: string;
-  password: string;
-  full_name: string;
+  first_name: string;
+  last_name: string;
+  phone_number?: string;
+  company_name?: string;
   role: UserRole;
-  phone?: string;
+  password: string;
 }
 
 export interface UserUpdate {
   email?: string;
-  full_name?: string;
+  first_name?: string;
+  last_name?: string;
+  phone_number?: string;
+  company_name?: string;
   role?: UserRole;
-  phone?: string;
   is_active?: boolean;
+  is_verified?: boolean;
 }
 
 export interface LoginRequest {

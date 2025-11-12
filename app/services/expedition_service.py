@@ -72,6 +72,10 @@ class ExpeditionService:
             vehicle_info=expedition_create.vehicle_info,
             eta=expedition_create.eta,
             notes=expedition_create.notes,
+            libelle=expedition_create.libelle,
+            grossiste_id=expedition_create.grossiste_id,
+            driver_id=expedition_create.driver_id,
+            contact_id=expedition_create.contact_id,
             created_by_id=current_user.id
         )
 
@@ -118,7 +122,10 @@ class ExpeditionService:
         if include_relations:
             query = query.options(
                 joinedload(Expedition.created_by),
-                joinedload(Expedition.validated_by)
+                joinedload(Expedition.validated_by),
+                joinedload(Expedition.grossiste),
+                joinedload(Expedition.driver),
+                joinedload(Expedition.contact)
             )
 
         expedition = query.filter(Expedition.id == expedition_id).first()
@@ -187,7 +194,10 @@ class ExpeditionService:
         """
         query = db.query(Expedition).options(
             joinedload(Expedition.created_by),
-            joinedload(Expedition.validated_by)
+            joinedload(Expedition.validated_by),
+            joinedload(Expedition.grossiste),
+            joinedload(Expedition.driver),
+            joinedload(Expedition.contact)
         )
 
         # Apply filters

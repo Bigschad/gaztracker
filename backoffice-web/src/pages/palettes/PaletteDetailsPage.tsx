@@ -10,7 +10,7 @@ const PaletteDetailsPage = () => {
 
   const { data: palette, isLoading } = useQuery({
     queryKey: ['palette', id],
-    queryFn: () => paletteService.getById(Number(id)),
+    queryFn: () => paletteService.getById(id!),
     enabled: !!id,
   });
 
@@ -31,7 +31,9 @@ const PaletteDetailsPage = () => {
             Retour
           </Button>
         </Link>
-        <h1 className="text-3xl font-bold mt-4">Palette {palette.rfid_tag}</h1>
+        <h1 className="text-3xl font-bold mt-4">
+          Palette {palette.rfid_tag?.tag_number || palette.id}
+        </h1>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -42,27 +44,41 @@ const PaletteDetailsPage = () => {
           <CardContent className="space-y-3">
             <div>
               <p className="text-sm text-muted-foreground">Tag RFID</p>
-              <p className="font-mono font-semibold">{palette.rfid_tag}</p>
+              {palette.rfid_tag ? (
+                <div>
+                  <p className="font-mono font-semibold">{String(palette.rfid_tag?.tag_number || '-')}</p>
+                  <span className={`inline-flex mt-1 px-2 py-0.5 text-xs font-semibold rounded ${
+                    palette.rfid_tag.status === 'ASSIGNED'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {String(palette.rfid_tag?.status || '')}
+                  </span>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 italic">Non assigné</p>
+              )}
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Type</p>
               <span className="inline-flex px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">
-                {palette.palette_type}
+                {String(palette.type || '')}
               </span>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Quantité de bouteilles</p>
-              <p className="font-semibold">{palette.bottle_quantity}</p>
-            </div>
-            <div>
               <p className="text-sm text-muted-foreground">Statut</p>
-              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded ${getStatusColor(palette.status)}`}>
-                {formatStatus(palette.status)}
+              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded ${getStatusColor(String(palette.status || ''))}`}>
+                {formatStatus(String(palette.status || ''))}
               </span>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Localisation actuelle</p>
-              <p className="font-semibold">{palette.current_location || '-'}</p>
+              <p className="font-semibold">
+                {palette.location_address ||
+                 (palette.location_latitude && palette.location_longitude
+                   ? `${palette.location_latitude.toFixed(4)}, ${palette.location_longitude.toFixed(4)}`
+                   : '-')}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -82,7 +98,7 @@ const PaletteDetailsPage = () => {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">ID Expédition</p>
-              <p className="font-semibold">{palette.expedition_id || '-'}</p>
+              <p className="font-semibold">{palette.current_expedition_id || '-'}</p>
             </div>
             {palette.notes && (
               <div>

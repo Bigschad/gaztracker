@@ -8,8 +8,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from uuid import UUID
 from datetime import datetime
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Dict, Any
 import logging
+import csv
+import io
 
 from app.models.rfid_tag import RFIDTag, RFIDTagStatus
 from app.models.user import User
@@ -54,9 +56,10 @@ class RFIDTagService:
         if existing:
             logger.warning(f"Attempt to create existing tag: {tag_create.tag_number}")
             raise ResourceAlreadyExistsException(
-                resource_type="RFID Tag",
+                resource_type="Tag RFID",
                 field="tag_number",
-                value=tag_create.tag_number
+                value=tag_create.tag_number,
+                message=f"Un tag RFID avec le numéro '{tag_create.tag_number}' existe déjà. Le numéro de tag doit être unique."
             )
 
         # Create the tag
@@ -314,7 +317,9 @@ class RFIDTagService:
     @staticmethod
     def delete_rfid_tag(db: Session, tag_id: UUID) -> bool:
         """
-        Delete an RFID tag (soft delete by setting is_active=False).
+        Delete an RFID tag permanently (hard delete).
+        
+        Only tags that are NOT_ASSIGNED can be permanently deleted.
 
         Args:
             db: Database session
@@ -332,7 +337,7 @@ class RFIDTagService:
         # Cannot delete assigned tags
         if tag.status == RFIDTagStatus.ASSIGNED:
             raise ValidationException(
-                message="Cannot delete an RFID tag that is assigned to a palette",
+                message="Impossible de supprimer définitivement un tag RFID qui est assigné à une palette. Veuillez d'abord désassigner le tag.",
                 details={
                     "tag_id": str(tag_id),
                     "tag_number": tag.tag_number,
@@ -340,11 +345,11 @@ class RFIDTagService:
                 }
             )
 
-        tag.is_active = False
-        db.add(tag)
+        # Hard delete - remove from database
+        db.delete(tag)
         db.commit()
 
-        logger.info(f"RFID tag soft deleted: {tag.tag_number}")
+        logger.info(f"RFID tag permanently deleted: {tag.tag_number}")
         return True
 
     @staticmethod
@@ -416,3 +421,112 @@ class RFIDTagService:
                     "allowed_transitions": [s.value for s in allowed_transitions.get(tag.status, [])]
                 }
             )
+
+    @staticmethod
+    def bulk_import_tags(
+        db: Session,
+        csv_content: str,
+        current_user: User
+    ) -> Dict[str, Any]:
+        """
+        Import RFID tags in bulk from CSV content.
+
+        CSV format expected:
+        - tag_number (required)
+        - notes (optional)
+
+        Args:
+            db: Database session
+            csv_content: CSV file content as string
+            current_user: User performing the import
+
+        Returns:
+            Dictionary with import results:
+            {
+                "success": int,
+                "failed": int,
+                "errors": [{"row": int, "tag_number": str, "error": str}]
+            }
+        """
+        success_count = 0
+        failed_count = 0
+        errors = []
+
+        try:
+            # Parse CSV content
+            csv_file = io.StringIO(csv_content)
+            csv_reader = csv.DictReader(csv_file)
+
+            # Validate headers
+            required_headers = ['tag_number']
+            if not all(header in csv_reader.fieldnames for header in required_headers):
+                raise ValidationException(
+                    message="CSV file must contain 'tag_number' column",
+                    details={"found_headers": csv_reader.fieldnames}
+                )
+
+            row_num = 1  # Start at 1 (header is row 0)
+            for row in csv_reader:
+                row_num += 1
+                tag_number = row.get('tag_number', '').strip()
+                notes = row.get('notes', '').strip() or None
+
+                # Skip empty rows
+                if not tag_number:
+                    continue
+
+                try:
+                    # Check if tag already exists
+                    existing = db.query(RFIDTag).filter(
+                        RFIDTag.tag_number == tag_number
+                    ).first()
+
+                    if existing:
+                        errors.append({
+                            "row": row_num,
+                            "tag_number": tag_number,
+                            "error": f"Le numéro de tag '{tag_number}' existe déjà. Le numéro de tag doit être unique."
+                        })
+                        failed_count += 1
+                        continue
+
+                    # Create the tag
+                    new_tag = RFIDTag(
+                        tag_number=tag_number,
+                        status=RFIDTagStatus.NOT_ASSIGNED,
+                        created_by_id=current_user.id,
+                        notes=notes,
+                        is_active=True
+                    )
+
+                    db.add(new_tag)
+                    success_count += 1
+
+                except Exception as e:
+                    errors.append({
+                        "row": row_num,
+                        "tag_number": tag_number,
+                        "error": str(e)
+                    })
+                    failed_count += 1
+                    logger.error(f"Error importing tag {tag_number} at row {row_num}: {str(e)}")
+
+            # Commit all successful imports
+            db.commit()
+            logger.info(f"Bulk import completed: {success_count} success, {failed_count} failed")
+
+        except ValidationException:
+            raise
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Bulk import failed: {str(e)}")
+            raise ValidationException(
+                message="Failed to process CSV file",
+                details={"error": str(e)}
+            )
+
+        return {
+            "success": success_count,
+            "failed": failed_count,
+            "errors": errors
+        }

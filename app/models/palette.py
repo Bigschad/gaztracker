@@ -4,7 +4,7 @@ Palette Model
 Defines the Palette model for tracking gas bottle pallets.
 """
 
-from sqlalchemy import Column, String, Enum as SQLEnum, Float, ForeignKey, Index
+from sqlalchemy import Column, String, Enum as SQLEnum, Float, ForeignKey, Index, Integer, Date
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
@@ -79,6 +79,24 @@ class Palette(Base, TimestampMixin):
         comment="Unique palette identifier"
     )
 
+    # Serial Number (human-readable identifier, auto-generated)
+    serial_number = Column(
+        String(20),
+        unique=True,
+        nullable=False,
+        index=True,
+        comment="Human-readable serial number (e.g., PAL-2025-00001)"
+    )
+
+    # Reference Code (code de référence, saisie manuelle)
+    reference_code = Column(
+        String(50),
+        unique=True,
+        nullable=True,
+        index=True,
+        comment="Code de référence personnalisé (saisie manuelle)"
+    )
+
     # RFID Tag - Relation avec le modèle RFIDTag
     rfid_tag_id = Column(
         UUID(as_uuid=True),
@@ -95,6 +113,29 @@ class Palette(Base, TimestampMixin):
         nullable=False,
         index=True,
         comment="Type of gas bottles (B6, B12, B28)"
+    )
+
+    # Capacity (capacité - nombre de bouteilles possible)
+    capacity = Column(
+        Integer,
+        nullable=True,
+        comment="Capacité en nombre de bouteilles possibles"
+    )
+
+    # Manufacturing Date (date de fabrication)
+    manufacturing_date = Column(
+        Date,
+        nullable=True,
+        comment="Date de fabrication de la palette"
+    )
+
+    # Current Partner/Location (grossiste actuel)
+    current_partner_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("partners.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="ID du partenaire (grossiste) chez qui se trouve actuellement la palette"
     )
 
     status = Column(
@@ -166,6 +207,11 @@ class Palette(Base, TimestampMixin):
         "Expedition",
         back_populates="palettes",
         foreign_keys=[current_expedition_id]
+    )
+
+    current_partner = relationship(
+        "Partner",
+        foreign_keys=[current_partner_id]
     )
 
     movements = relationship(

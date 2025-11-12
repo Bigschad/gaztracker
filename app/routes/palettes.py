@@ -11,7 +11,7 @@ from typing import Optional
 import logging
 import math
 
-from app.database import get_db
+from app.database import get_sync_db
 from app.middleware.auth_middleware import get_current_user
 from app.models.user import User, UserRole
 from app.models.palette import PaletteType, PaletteStatus
@@ -66,7 +66,7 @@ router = APIRouter()
 )
 async def create_palette(
     palette_create: PaletteCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(get_current_user),
 ):
     """Create a new palette."""
@@ -111,7 +111,7 @@ async def create_palette(
 )
 async def get_palette(
     palette_id: UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(get_current_user),
 ):
     """Get a palette by ID."""
@@ -144,7 +144,7 @@ async def get_palette(
 )
 async def get_palette_by_rfid(
     rfid_tag_number: str,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(get_current_user),
 ):
     """Get a palette by its RFID tag number."""
@@ -188,7 +188,7 @@ async def list_palettes(
     search: Optional[str] = Query(None, description="Search in RFID or notes"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(get_current_user),
 ):
     """List palettes with filters and pagination."""
@@ -245,7 +245,7 @@ async def list_palettes(
 async def update_palette(
     palette_id: UUID,
     palette_update: PaletteUpdate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(get_current_user),
 ):
     """Update a palette."""
@@ -291,7 +291,7 @@ async def update_palette(
 async def update_palette_location(
     palette_id: UUID,
     location_update: PaletteLocationUpdate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(get_current_user),
 ):
     """Update palette location."""
@@ -333,7 +333,7 @@ async def update_palette_location(
 )
 async def get_palette_history(
     palette_id: UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(get_current_user),
 ):
     """Get complete movement history for a palette."""
@@ -381,7 +381,7 @@ async def get_palette_history(
 )
 async def scan_palette(
     scan_request: PaletteScanRequest,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(get_current_user),
 ):
     """Scan a palette by RFID."""
@@ -421,7 +421,7 @@ async def scan_palette(
     description="Get aggregated statistics about all palettes in the system.",
 )
 async def get_palette_statistics(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(get_current_user),
 ):
     """Get palette statistics."""

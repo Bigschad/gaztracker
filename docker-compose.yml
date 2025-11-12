@@ -17,6 +17,7 @@ services:
     volumes:
       - ./app:/app/app
       - ./logs:/app/logs
+      - ./alembic:/app/alembic
     networks:
       - gaztracker_network
     depends_on:

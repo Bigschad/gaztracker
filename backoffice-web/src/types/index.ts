@@ -5,3 +5,6 @@ export * from './palette';
 export * from './expedition';
 export * from './notification';
 export * from './reports';
+export * from './rfidTag';
+export * from './partner';
+export * from './contact';

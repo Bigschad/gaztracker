@@ -18,7 +18,7 @@ from app.database import Base
 # Import all models to ensure they're registered with Base
 from app.models import (
     User, Palette, Expedition, PaletteMovement,
-    Notification, AuditLog
+    Notification, AuditLog, Partner, Contact
 )
 
 # this is the Alembic Config object, which provides
