@@ -1,0 +1,166 @@
+name: Deploy to Lightsail
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  workflow_dispatch: # Permet le déclenchement manuel
+
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  deploy:
+    name: Deploy to Lightsail Server
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set environment based on branch
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "ENVIRONMENT=production" >> $GITHUB_ENV
+            echo "DEPLOY_PATH=/opt/gaztracker" >> $GITHUB_ENV
+          else
+            echo "ENVIRONMENT=recette" >> $GITHUB_ENV
+            echo "DEPLOY_PATH=/opt/gaztracker-recette" >> $GITHUB_ENV
+          fi
+      
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.LIGHTSAIL_SSH_KEY }}" > ~/.ssh/lightsail_key
+          chmod 600 ~/.ssh/lightsail_key
+          ssh-keyscan -H ${{ secrets.LIGHTSAIL_HOST }} >> ~/.ssh/known_hosts
+      
+      - name: Create deployment package
+        run: |
+          # Créer une archive sans node_modules
+          tar -czf deploy.tar.gz \
+            --exclude='node_modules' \
+            --exclude='.git' \
+            --exclude='backoffice-web/node_modules' \
+            --exclude='backoffice-web/dist' \
+            --exclude='*.pyc' \
+            --exclude='__pycache__' \
+            --exclude='.env.local' \
+            .
+      
+      - name: Upload to server
+        run: |
+          scp -i ~/.ssh/lightsail_key \
+            -o StrictHostKeyChecking=no \
+            deploy.tar.gz \
+            ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }}:/tmp/
+      
+      - name: Deploy on server
+        run: |
+          ssh -i ~/.ssh/lightsail_key \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }} << 'ENDSSH'
+          
+          set -e
+          
+          # Variables
+          DEPLOY_PATH="${{ env.DEPLOY_PATH }}"
+          ENV="${{ env.ENVIRONMENT }}"
+          
+          echo "🚀 Déploiement de GazTracker - Environnement: $ENV"
+          
+          # Créer le répertoire si nécessaire
+          sudo mkdir -p $DEPLOY_PATH
+          sudo chown -R $USER:$USER $DEPLOY_PATH
+          
+          # Backup de la configuration actuelle
+          if [ -f "$DEPLOY_PATH/.env" ]; then
+            cp $DEPLOY_PATH/.env /tmp/.env.backup
+          fi
+          
+          # Extraire la nouvelle version
+          cd $DEPLOY_PATH
+          tar -xzf /tmp/deploy.tar.gz
+          
+          # Restaurer la config
+          if [ -f "/tmp/.env.backup" ]; then
+            cp /tmp/.env.backup $DEPLOY_PATH/.env
+          fi
+          
+          # Nettoyer
+          rm /tmp/deploy.tar.gz
+          
+          # Arrêter les containers existants
+          echo "⏹️  Arrêt des containers..."
+          sudo docker-compose down || true
+          
+          # Build et démarrage
+          echo "🔨 Build des images Docker..."
+          sudo docker-compose build --no-cache
+          
+          echo "▶️  Démarrage des containers..."
+          sudo docker-compose up -d
+          
+          # Attendre que les services soient prêts
+          echo "⏳ Attente du démarrage des services..."
+          sleep 15
+          
+          # Vérifier l'état
+          echo "✅ Vérification de l'état des services..."
+          sudo docker-compose ps
+          
+          # Afficher les logs des services
+          echo "📋 Logs des services:"
+          sudo docker-compose logs --tail=20
+          
+          # Nettoyage des images inutilisées
+          echo "🧹 Nettoyage..."
+          sudo docker system prune -f
+          
+          echo "✨ Déploiement terminé avec succès!"
+          ENDSSH
+      
+      - name: Health check
+        run: |
+          sleep 10
+          
+          # Déterminer l'URL en fonction de l'environnement
+          if [[ "${{ env.ENVIRONMENT }}" == "production" ]]; then
+            API_URL="http://${{ secrets.LIGHTSAIL_HOST }}:8000/health"
+          else
+            API_URL="http://${{ secrets.LIGHTSAIL_HOST }}:8001/health"
+          fi
+          
+          echo "🔍 Health check: $API_URL"
+          
+          # Tester l'API
+          response=$(curl -s -o /dev/null -w "%{http_code}" $API_URL || echo "000")
+          
+          if [ "$response" == "200" ]; then
+            echo "✅ API est opérationnelle!"
+          else
+            echo "❌ API ne répond pas correctement (HTTP $response)"
+            exit 1
+          fi
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f ~/.ssh/lightsail_key
+          rm -f deploy.tar.gz
+      
+      - name: Notification on success
+        if: success()
+        run: |
+          echo "✅ Déploiement réussi sur ${{ env.ENVIRONMENT }}"
+          echo "🔗 Backend: http://${{ secrets.LIGHTSAIL_HOST }}:8000"
+          echo "🔗 Frontend: http://${{ secrets.LIGHTSAIL_HOST }}:3000"
+      
+      - name: Notification on failure
+        if: failure()
+        run: |
+          echo "❌ Le déploiement a échoué"
+          echo "Vérifiez les logs ci-dessus pour plus de détails"
+
