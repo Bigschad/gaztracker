@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: gaztracker_postgres
+    env_file:
+      - .env.db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gaztracker_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - gaztracker-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: gaztracker_redis
+    env_file:
+      - .env.redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - gaztracker-network
+
+  # FastAPI Backend
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gaztracker_backend
+    env_file:
+      - .env.app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - gaztracker-network
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./backoffice-web
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
+    container_name: gaztracker_frontend
+    env_file:
+      - .env.frontend
+    depends_on:
+      - app
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    restart: unless-stopped
+    networks:
+      - gaztracker-network
+
+networks:
+  gaztracker-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+
