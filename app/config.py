@@ -122,7 +122,7 @@ class Settings(BaseSettings):
     # CORS Configuration
     # =============================================================================
     ALLOWED_ORIGINS: Union[str, List[str]] = Field(
-        default=["http://localhost:3000", "http://localhost:8080"],
+        default=["http://localhost:3000", "http://localhost:8080", "http://localhost:8082"],
         description="Allowed CORS origins"
     )
     ALLOW_CREDENTIALS: bool = Field(default=True, description="Allow credentials in CORS")

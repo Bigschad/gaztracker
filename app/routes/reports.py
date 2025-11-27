@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime
 
-from app.database import get_db
+from app.database import get_sync_db
 from app.models.user import User
 from app.schemas.reports import (
     PaletteStatistics,
@@ -30,7 +30,7 @@ from app.schemas.reports import (
     DestinationData
 )
 from app.services.reports_service import ReportsService
-from app.middleware.auth_middleware import get_current_user
+from app.middleware.auth_middleware import get_current_user_sync
 from app.middleware.rbac import require_role
 
 router = APIRouter()
@@ -49,7 +49,7 @@ router = APIRouter()
 async def get_palette_statistics(
     start_date: Optional[datetime] = Query(None, description="Start date for filtering"),
     end_date: Optional[datetime] = Query(None, description="End date for filtering"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
@@ -77,7 +77,7 @@ async def get_palette_statistics(
 )
 async def get_palette_utilization_trend(
     days: int = Query(30, ge=1, le=365, description="Number of days to analyze"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
@@ -103,7 +103,7 @@ async def get_palette_utilization_trend(
     description="Get current palette distribution across locations."
 )
 async def get_palette_distribution(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
@@ -131,7 +131,7 @@ async def get_palette_distribution(
 async def get_expedition_statistics(
     start_date: Optional[datetime] = Query(None, description="Start date for filtering"),
     end_date: Optional[datetime] = Query(None, description="End date for filtering"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
@@ -158,9 +158,9 @@ async def get_expedition_statistics(
     summary="Get expedition trend",
     description="Get expedition creation trend over time."
 )
-async def get_expedition_trend(
+def get_expedition_trend(
     days: int = Query(30, ge=1, le=365, description="Number of days to analyze"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
@@ -187,7 +187,7 @@ async def get_expedition_trend(
 )
 async def get_top_destinations(
     limit: int = Query(10, ge=1, le=50, description="Number of destinations to return"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
@@ -219,7 +219,7 @@ async def get_top_destinations(
 async def get_performance_report(
     start_date: Optional[datetime] = Query(None, description="Start date for filtering"),
     end_date: Optional[datetime] = Query(None, description="End date for filtering"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
@@ -248,9 +248,9 @@ async def get_performance_report(
     summary="Get dashboard overview",
     description="Get complete dashboard overview with real-time metrics, trends, and alerts."
 )
-async def get_dashboard_overview(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+def get_dashboard_overview(
+    db: Session = Depends(get_sync_db),
+    current_user: User = Depends(get_current_user_sync)
 ):
     """
     Get dashboard overview.
@@ -264,7 +264,7 @@ async def get_dashboard_overview(
     - 7-day trends (expeditions, palette utilization)
     """
     reports_service = ReportsService(db)
-    overview = await reports_service.get_dashboard_overview()
+    overview = reports_service.get_dashboard_overview()
     return DashboardOverview(**overview)
 
 
@@ -282,7 +282,7 @@ async def get_user_performance(
     user_id: Optional[str] = Query(None, description="Specific user ID (optional)"),
     start_date: Optional[datetime] = Query(None, description="Start date for filtering"),
     end_date: Optional[datetime] = Query(None, description="End date for filtering"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN"]))
 ):
     """
@@ -317,7 +317,7 @@ async def export_expeditions(
     start_date: Optional[datetime] = Query(None, description="Start date for filtering"),
     end_date: Optional[datetime] = Query(None, description="End date for filtering"),
     format: str = Query("json", regex="^(json|csv)$", description="Export format (json, csv)"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
@@ -353,7 +353,7 @@ async def export_expeditions(
 )
 async def export_palettes(
     format: str = Query("json", regex="^(json|csv)$", description="Export format (json, csv)"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
@@ -392,8 +392,8 @@ async def export_palettes(
     description="Get quick statistics available to all users."
 )
 async def get_quick_stats(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_sync_db),
+    current_user: User = Depends(get_current_user_sync)
 ):
     """
     Get quick statistics.

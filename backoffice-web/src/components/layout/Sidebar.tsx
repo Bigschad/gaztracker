@@ -1,8 +1,8 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   Package,
-  Truck,
   Users,
   Bell,
   BarChart3,
@@ -10,8 +10,15 @@ import {
   Tag,
   Building2,
   UserCircle,
+  Layers,
+  Factory,
+  Warehouse,
+  FileText,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { GroupeLogo } from './GroupeLogo';
 import clsx from 'clsx';
 
 interface SidebarProps {
@@ -26,64 +33,112 @@ interface NavItem {
   adminOnly?: boolean;
 }
 
-const navItems: NavItem[] = [
-  {
-    name: 'Tableau de bord',
-    path: '/dashboard',
-    icon: LayoutDashboard,
-  },
-  {
-    name: 'Palettes',
-    path: '/palettes',
-    icon: Package,
-  },
-  {
-    name: 'Expéditions',
-    path: '/expeditions',
-    icon: Truck,
-  },
-  {
-    name: 'Tags RFID',
-    path: '/rfid-tags',
-    icon: Tag,
-  },
-  {
-    name: 'Utilisateurs',
-    path: '/users',
-    icon: Users,
-    adminOnly: true,
-  },
-  {
-    name: 'Notifications',
-    path: '/notifications',
-    icon: Bell,
-  },
-  {
-    name: 'Rapports',
-    path: '/reports',
-    icon: BarChart3,
-  },
-  {
-    name: 'Partenaires',
-    path: '/partners',
-    icon: Building2,
-  },
-  {
-    name: 'Contacts',
-    path: '/contacts',
-    icon: UserCircle,
-  },
-];
+interface NavSection {
+  name: string;
+  icon?: React.ComponentType<{ className?: string }>;
+  items: NavItem[];
+}
 
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { isAdmin } = useAuth();
+  const [expandedSections, setExpandedSections] = useState<string[]>(['operations', 'organisation']);
 
-  const filteredNavItems = navItems.filter((item) => {
-    if (item.adminOnly) {
-      return isAdmin();
-    }
-    return true;
-  });
+  const toggleSection = (sectionName: string) => {
+    setExpandedSections((prev) =>
+      prev.includes(sectionName)
+        ? prev.filter((s) => s !== sectionName)
+        : [...prev, sectionName]
+    );
+  };
+
+  // Top level items (no submenu)
+  const topItems: NavItem[] = [
+    {
+      name: 'Tableau de bord',
+      path: '/dashboard',
+      icon: LayoutDashboard,
+    },
+    {
+      name: 'Rapports',
+      path: '/reports',
+      icon: BarChart3,
+    },
+  ];
+
+  // Sections with subitems
+  const sections: NavSection[] = [
+    {
+      name: 'Opérations',
+      items: [
+        {
+          name: 'Enlèvements',
+          path: '/bons-enlevement',
+          icon: FileText,
+        },
+        {
+          name: 'Retours',
+          path: '/bons-reception-retour',
+          icon: FileText,
+        },
+        {
+          name: 'Palettes',
+          path: '/palettes',
+          icon: Package,
+        },
+        {
+          name: 'Tags RFID',
+          path: '/rfid-tags',
+          icon: Tag,
+        },
+      ],
+    },
+    {
+      name: 'Organisation',
+      items: [
+        {
+          name: 'Dépôts',
+          path: '/depots',
+          icon: Warehouse,
+        },
+        {
+          name: 'Partenaires',
+          path: '/partners',
+          icon: Building2,
+        },
+        {
+          name: 'Centres Remplisseurs',
+          path: '/centres-remplisseurs',
+          icon: Factory,
+        },
+        {
+          name: 'Groupes',
+          path: '/groupes',
+          icon: Layers,
+        },
+      ],
+    },
+    {
+      name: 'Paramétrages',
+      items: [
+        {
+          name: 'Contacts',
+          path: '/contacts',
+          icon: UserCircle,
+        },
+        {
+          name: 'Utilisateurs',
+          path: '/users',
+          icon: Users,
+          adminOnly: true,
+        },
+        {
+          name: 'Réglages',
+          path: '/settings',
+          icon: Bell,
+        },
+      ],
+    },
+  ];
 
   return (
     <>
@@ -114,27 +169,85 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             </button>
           </div>
 
+          {/* Group Logo */}
+          <GroupeLogo />
+
           {/* Navigation */}
           <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-            {filteredNavItems.map((item) => {
+            {/* Top level items */}
+            {topItems.map((item) => {
               const Icon = item.icon;
               return (
                 <NavLink
                   key={item.path}
                   to={item.path}
-                  onClick={onClose}
+                  onClick={() => onClose()}
                   className={({ isActive }) =>
                     clsx(
-                      'flex items-center space-x-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                       isActive
                         ? 'bg-primary text-primary-foreground'
-                        : 'text-foreground hover:bg-accent hover:text-accent-foreground'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                     )
                   }
                 >
-                  <Icon className="h-5 w-5 shrink-0" />
-                  <span>{item.name}</span>
+                  <Icon className="h-5 w-5" />
+                  {item.name}
                 </NavLink>
+              );
+            })}
+
+            {/* Sections with subitems */}
+            {sections.map((section) => {
+              const isExpanded = expandedSections.includes(section.name.toLowerCase());
+              const filteredItems = section.items.filter((item) =>
+                item.adminOnly ? isAdmin() : true
+              );
+
+              if (filteredItems.length === 0) return null;
+
+              return (
+                <div key={section.name} className="space-y-1">
+                  {/* Section header */}
+                  <button
+                    onClick={() => toggleSection(section.name.toLowerCase())}
+                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                  >
+                    <span>{section.name}</span>
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                  </button>
+
+                  {/* Section items */}
+                  {isExpanded && (
+                    <div className="ml-2 space-y-1">
+                      {filteredItems.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <NavLink
+                            key={item.path}
+                            to={item.path}
+                            onClick={() => onClose()}
+                            className={({ isActive }) =>
+                              clsx(
+                                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                                isActive
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                              )
+                            }
+                          >
+                            <Icon className="h-4 w-4" />
+                            {item.name}
+                          </NavLink>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </nav>
@@ -143,3 +256,5 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     </>
   );
 };
+
+export { Sidebar };

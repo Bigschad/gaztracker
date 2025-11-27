@@ -64,7 +64,7 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json",
     lifespan=lifespan,
-    redirect_slashes=False,
+    redirect_slashes=True,
 )
 
 
@@ -73,12 +73,27 @@ app = FastAPI(
 # =============================================================================
 
 # CORS Middleware
+# En développement, autoriser toutes les origines pour faciliter les tests
+cors_origins = settings.ALLOWED_ORIGINS
+if settings.is_development:
+    # En développement, autoriser localhost sur tous les ports
+    cors_origins = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:8080",
+        "http://localhost:8082",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+        "http://127.0.0.1:8080",
+        "http://127.0.0.1:8082",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=settings.ALLOW_CREDENTIALS,
-    allow_methods=settings.ALLOWED_METHODS,
-    allow_headers=settings.ALLOWED_HEADERS,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -217,9 +232,10 @@ app.include_router(rfid_tags.router, prefix=f"{settings.API_V1_PREFIX}/rfid-tags
 from app.routes import palettes
 app.include_router(palettes.router, prefix=f"{settings.API_V1_PREFIX}/palettes", tags=["Palettes"])
 
-# Phase 4: Expedition routes
-from app.routes import expeditions
-app.include_router(expeditions.router, prefix=f"{settings.API_V1_PREFIX}/expeditions", tags=["Expeditions"])
+# Phase 4: Expedition routes - DEPRECATED
+# Expeditions are replaced by Bons d'Enlèvement (deliveries) and Bons de Réception Retour (returns)
+# from app.routes import expeditions
+# app.include_router(expeditions.router, prefix=f"{settings.API_V1_PREFIX}/expeditions", tags=["Expeditions"])
 
 # Phase 5: Notification routes
 from app.routes import notifications
@@ -236,6 +252,13 @@ app.include_router(partners.router, prefix=f"{settings.API_V1_PREFIX}/partners",
 # Contacts routes
 from app.routes import contacts
 app.include_router(contacts.router, prefix=f"{settings.API_V1_PREFIX}/contacts", tags=["Contacts"])
+
+# =============================================================================
+# New API v1 Routes (Phase 1-4: Restructured Workflow)
+# =============================================================================
+
+from app.api.v1.api import api_router
+app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 
 # =============================================================================

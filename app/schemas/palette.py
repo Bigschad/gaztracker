@@ -71,7 +71,7 @@ class PaletteUpdate(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "status": "EN_STOCK",
+                "status": "AU_DEPOT",
                 "notes": "Palette vérifiée et prête"
             }
         }
@@ -156,7 +156,7 @@ class PaletteResponse(PaletteBase):
                     "assigned_at": "2024-01-15T10:35:00Z"
                 },
                 "type": "B12",
-                "status": "EN_STOCK",
+                "status": "AU_DEPOT",
                 "location_latitude": 48.8566,
                 "location_longitude": 2.3522,
                 "location_address": "Usine principale, Paris",
@@ -198,7 +198,7 @@ class PaletteListResponse(BaseModel):
                         "serial_number": "PAL-2025-00001",
                         "rfid_tag": "GAZ123456789",
                         "type": "B12",
-                        "status": "EN_STOCK",
+                        "status": "AU_DEPOT",
                         "location_latitude": 48.8566,
                         "location_longitude": 2.3522,
                         "location_address": "Usine principale",
@@ -231,7 +231,7 @@ class PaletteScanResponse(BaseModel):
                     "serial_number": "PAL-2025-00001",
                     "rfid_tag": "GAZ123456789",
                     "type": "B12",
-                    "status": "EN_ROUTE",
+                    "status": "EN_ROUTE_LIVRAISON",
                     "location_latitude": 48.8566,
                     "location_longitude": 2.3522,
                     "location_address": None,
@@ -270,9 +270,10 @@ class PaletteStatistics(BaseModel):
                     "B28": 100
                 },
                 "by_status": {
-                    "EN_STOCK": 300,
-                    "EN_ROUTE": 150,
-                    "LIVREE": 50
+                    "AU_DEPOT": 200,
+                    "AU_CENTRE": 100,
+                    "EN_ROUTE_LIVRAISON": 150,
+                    "EN_ROUTE_RETOUR": 50
                 },
                 "in_stock": 300,
                 "in_transit": 150,

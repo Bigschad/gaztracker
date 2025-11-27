@@ -19,23 +19,35 @@ class MovementAction(str, enum.Enum):
     Types of actions that can be performed on palettes.
 
     - CREATION: Palette created
-    - SCANNING_DEPART: Scanned at departure
-    - SCANNING_ARRIVEE: Scanned at arrival
-    - VALIDATION_RECEPTION: Reception validated
+    - ASSIGNATION_BON_ENLEVEMENT: Assigned to bon d'enlèvement
+    - CHARGEMENT_CENTRE: Loaded at filling center
+    - DEPART_CENTRE: Departure from filling center
+    - ARRIVEE_DEPOT: Arrival at depot
+    - LIVRAISON_DEPOT: Delivered to depot
+    - COLLECTE_VIDE: Empty collected
+    - ASSIGNATION_BON_RETOUR: Assigned to bon de réception retour
+    - DEPART_DEPOT: Departure from depot (return)
+    - ARRIVEE_CENTRE: Arrival at filling center
+    - CONTROLE_QUALITE: Quality control
+    - VALIDATION_RETOUR: Return validated
     - UPDATE_LOCATION: Location updated
     - STATUS_CHANGE: Status changed
-    - ASSIGNATION_EXPEDITION: Assigned to expedition
-    - RETOUR_USINE: Returned to factory
     - MISE_HORS_SERVICE: Put out of service
     """
     CREATION = "CREATION"
-    SCANNING_DEPART = "SCANNING_DEPART"
-    SCANNING_ARRIVEE = "SCANNING_ARRIVEE"
-    VALIDATION_RECEPTION = "VALIDATION_RECEPTION"
+    ASSIGNATION_BON_ENLEVEMENT = "ASSIGNATION_BON_ENLEVEMENT"
+    CHARGEMENT_CENTRE = "CHARGEMENT_CENTRE"
+    DEPART_CENTRE = "DEPART_CENTRE"
+    ARRIVEE_DEPOT = "ARRIVEE_DEPOT"
+    LIVRAISON_DEPOT = "LIVRAISON_DEPOT"
+    COLLECTE_VIDE = "COLLECTE_VIDE"
+    ASSIGNATION_BON_RETOUR = "ASSIGNATION_BON_RETOUR"
+    DEPART_DEPOT = "DEPART_DEPOT"
+    ARRIVEE_CENTRE = "ARRIVEE_CENTRE"
+    CONTROLE_QUALITE = "CONTROLE_QUALITE"
+    VALIDATION_RETOUR = "VALIDATION_RETOUR"
     UPDATE_LOCATION = "UPDATE_LOCATION"
     STATUS_CHANGE = "STATUS_CHANGE"
-    ASSIGNATION_EXPEDITION = "ASSIGNATION_EXPEDITION"
-    RETOUR_USINE = "RETOUR_USINE"
     MISE_HORS_SERVICE = "MISE_HORS_SERVICE"
 
 
@@ -80,12 +92,46 @@ class PaletteMovement(Base):
         comment="Related palette"
     )
 
-    expedition_id = Column(
+    # Workflow Document References
+    bon_enlevement_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("expeditions.id", ondelete="SET NULL"),
+        ForeignKey("bons_enlevement.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
-        comment="Related expedition (optional)"
+        comment="Related bon d'enlèvement (optional)"
+    )
+    
+    bon_reception_retour_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("bons_reception_retour.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Related bon de réception retour (optional)"
+    )
+    
+    livraison_detail_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("livraisons_details.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Related livraison detail (optional)"
+    )
+    
+    # Location References
+    depot_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("depots.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Related depot (optional)"
+    )
+    
+    centre_remplisseur_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("centres_remplisseurs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Related filling center (optional)"
     )
 
     user_id = Column(
@@ -162,10 +208,32 @@ class PaletteMovement(Base):
         "Palette",
         back_populates="movements"
     )
-
-    expedition = relationship(
-        "Expedition",
-        back_populates="movements"
+    
+    bon_enlevement = relationship(
+        "BonEnlevement",
+        foreign_keys=[bon_enlevement_id]
+    )
+    
+    bon_reception_retour = relationship(
+        "BonReceptionRetour",
+        back_populates="movements",
+        foreign_keys=[bon_reception_retour_id]
+    )
+    
+    livraison_detail = relationship(
+        "LivraisonDetail",
+        back_populates="movements",
+        foreign_keys=[livraison_detail_id]
+    )
+    
+    depot = relationship(
+        "Depot",
+        foreign_keys=[depot_id]
+    )
+    
+    centre_remplisseur = relationship(
+        "CentreRemplisseur",
+        foreign_keys=[centre_remplisseur_id]
     )
 
     user = relationship(
@@ -176,8 +244,12 @@ class PaletteMovement(Base):
     # Indexes
     __table_args__ = (
         Index("ix_movements_palette_timestamp", "palette_id", "timestamp"),
-        Index("ix_movements_expedition_timestamp", "expedition_id", "timestamp"),
+        Index("ix_movements_bon_enlevement", "bon_enlevement_id", "timestamp"),
+        Index("ix_movements_bon_retour", "bon_reception_retour_id", "timestamp"),
+        Index("ix_movements_livraison", "livraison_detail_id", "timestamp"),
         Index("ix_movements_action_timestamp", "action", "timestamp"),
+        Index("ix_movements_depot", "depot_id", "timestamp"),
+        Index("ix_movements_centre", "centre_remplisseur_id", "timestamp"),
     )
 
     def __repr__(self) -> str:

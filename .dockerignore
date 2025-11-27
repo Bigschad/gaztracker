@@ -82,3 +82,8 @@ Thumbs.db
 
 # PgAdmin
 pgadmin_data/
+
+# Node modules
+node_modules/
+backoffice-web/node_modules/
+mobile-app/node_modules/

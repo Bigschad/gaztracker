@@ -47,7 +47,8 @@ COPY --chown=appuser:appuser scripts/docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Create necessary directories
-RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs
+RUN mkdir -p /app/logs /app/uploads/logos && \
+    chown -R appuser:appuser /app/logs /app/uploads
 
 # Switch to non-root user
 USER appuser

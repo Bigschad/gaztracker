@@ -111,8 +111,8 @@ class ReportsService:
                 for p in most_used
             ],
             "maintenance_needed": maintenance_needed,
-            "available_palettes": by_status.get("EN_STOCK", 0),
-            "in_use_palettes": by_status.get("EN_ROUTE", 0),
+            "available_palettes": by_status.get("AU_DEPOT", 0) + by_status.get("AU_CENTRE", 0),
+            "in_use_palettes": by_status.get("EN_ROUTE_LIVRAISON", 0) + by_status.get("EN_ROUTE_RETOUR", 0),
             "damaged_palettes": by_status.get("OUT", 0)
         }
 
@@ -148,7 +148,7 @@ class ReportsService:
             func.date(PaletteMovement.timestamp)
         )
 
-        result = await self.db.execute(stmt)
+        result = self.db.execute(stmt)
         daily_data = result.all()
 
         return [
@@ -271,7 +271,7 @@ class ReportsService:
             ).count()
         }
 
-    async def get_expedition_trend(
+    def get_expedition_trend(
         self,
         days: int = 30
     ) -> List[Dict[str, Any]]:
@@ -302,7 +302,7 @@ class ReportsService:
             func.date(Expedition.created_at)
         )
 
-        result = await self.db.execute(stmt)
+        result = self.db.execute(stmt)
         daily_data = result.all()
 
         return [
@@ -468,7 +468,7 @@ class ReportsService:
     # Dashboard Data
     # =============================================================================
 
-    async def get_dashboard_overview(self) -> Dict[str, Any]:
+    def get_dashboard_overview(self) -> Dict[str, Any]:
         """
         Get complete dashboard overview data.
 
@@ -478,19 +478,19 @@ class ReportsService:
         logger.info("Generating dashboard overview...")
 
         # Palette Stats
-        result = await self.db.execute(select(func.count()).select_from(Palette))
+        result = self.db.execute(select(func.count()).select_from(Palette))
         total_palettes = result.scalar() or 0
 
-        result = await self.db.execute(
+        result = self.db.execute(
             select(func.count()).select_from(Palette).where(
-                Palette.status == PaletteStatus.EN_STOCK
+                Palette.status.in_([PaletteStatus.AU_DEPOT, PaletteStatus.AU_CENTRE])
             )
         )
         available_palettes = result.scalar() or 0
 
-        result = await self.db.execute(
+        result = self.db.execute(
             select(func.count()).select_from(Palette).where(
-                Palette.status == PaletteStatus.EN_ROUTE
+                Palette.status.in_([PaletteStatus.EN_CHARGEMENT, PaletteStatus.EN_ROUTE_LIVRAISON, PaletteStatus.EN_ROUTE_RETOUR])
             )
         )
         palettes_in_transit = result.scalar() or 0
@@ -499,10 +499,10 @@ class ReportsService:
         utilization_rate = (palettes_in_transit / total_palettes * 100) if total_palettes > 0 else 0.0
 
         # Expedition Stats
-        result = await self.db.execute(select(func.count()).select_from(Expedition))
+        result = self.db.execute(select(func.count()).select_from(Expedition))
         total_expeditions = result.scalar() or 0
 
-        result = await self.db.execute(
+        result = self.db.execute(
             select(func.count()).select_from(Expedition).where(
                 Expedition.status == ExpeditionStatus.EN_TRANSIT
             )
@@ -510,7 +510,7 @@ class ReportsService:
         expeditions_in_transit = result.scalar() or 0
 
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-        result = await self.db.execute(
+        result = self.db.execute(
             select(func.count()).select_from(Expedition).where(
                 Expedition.status == ExpeditionStatus.LIVREE,
                 Expedition.date_delivery >= today_start
@@ -518,7 +518,7 @@ class ReportsService:
         )
         completed_today = result.scalar() or 0
 
-        result = await self.db.execute(
+        result = self.db.execute(
             select(func.count()).select_from(Expedition).where(
                 Expedition.eta < datetime.utcnow(),
                 Expedition.status.notin_([ExpeditionStatus.LIVREE, ExpeditionStatus.ANNULEE]),
@@ -528,10 +528,10 @@ class ReportsService:
         delayed_expeditions = result.scalar() or 0
 
         # Notification Stats
-        result = await self.db.execute(select(func.count()).select_from(Notification))
+        result = self.db.execute(select(func.count()).select_from(Notification))
         total_notifications = result.scalar() or 0
 
-        result = await self.db.execute(
+        result = self.db.execute(
             select(func.count()).select_from(Notification).where(
                 Notification.status == NotificationStatus.SENT,
                 Notification.created_at >= today_start
@@ -539,7 +539,7 @@ class ReportsService:
         )
         sent_today = result.scalar() or 0
 
-        result = await self.db.execute(
+        result = self.db.execute(
             select(func.count()).select_from(Notification).where(
                 Notification.status == NotificationStatus.FAILED,
                 Notification.created_at >= today_start
@@ -550,14 +550,14 @@ class ReportsService:
         # Recent Activity (last 24 hours)
         last_24h = datetime.utcnow() - timedelta(hours=24)
 
-        result = await self.db.execute(
+        result = self.db.execute(
             select(func.count()).select_from(Expedition).where(
                 Expedition.created_at >= last_24h
             )
         )
         recent_expeditions = result.scalar() or 0
 
-        result = await self.db.execute(
+        result = self.db.execute(
             select(func.count()).select_from(Expedition).where(
                 Expedition.status == ExpeditionStatus.LIVREE,
                 Expedition.date_delivery >= last_24h
@@ -565,7 +565,7 @@ class ReportsService:
         )
         recent_deliveries = result.scalar() or 0
 
-        result = await self.db.execute(
+        result = self.db.execute(
             select(func.count()).select_from(Expedition).where(
                 Expedition.status == ExpeditionStatus.ARRIVEE
             )
@@ -573,7 +573,7 @@ class ReportsService:
         pending_validations = result.scalar() or 0
 
         # Alerts
-        result = await self.db.execute(
+        result = self.db.execute(
             select(func.count()).select_from(Notification).where(
                 Notification.status == NotificationStatus.FAILED
             )
@@ -581,7 +581,7 @@ class ReportsService:
         failed_notifications = result.scalar() or 0
 
         # Trends (7 days)
-        expedition_trend = await self.get_expedition_trend(days=7)
+        expedition_trend = self.get_expedition_trend(days=7)
         expeditions_7days = [
             {"date": item["date"], "count": item["expedition_count"]}
             for item in expedition_trend
@@ -589,7 +589,7 @@ class ReportsService:
 
         # For deliveries, we'll get completed expeditions in the last 7 days
         seven_days_ago = datetime.utcnow() - timedelta(days=7)
-        result = await self.db.execute(
+        result = self.db.execute(
             select(
                 func.date(Expedition.date_delivery).label('date'),
                 func.count(Expedition.id).label('count')

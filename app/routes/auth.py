@@ -4,6 +4,7 @@ Authentication Routes
 API endpoints for authentication (login, logout, token refresh, user info).
 """
 
+from typing import Optional
 from fastapi import APIRouter, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -113,7 +114,7 @@ async def login(
 )
 async def logout(
     request: Request,
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: AsyncSession = Depends(get_db)
 ) -> None:
     """
@@ -121,13 +122,17 @@ async def logout(
 
     Args:
         request: FastAPI request object
-        credentials: HTTP Bearer token
+        credentials: HTTP Bearer token (optional - allows logout without token)
         db: Database session
 
     Note:
-        Gracefully handles expired tokens since user is logging out anyway.
+        Gracefully handles expired tokens and missing tokens since user is logging out anyway.
     """
-    # Extract token
+    # Extract token if provided
+    if not credentials:
+        # No token provided, just return success
+        return
+    
     token = credentials.credentials
 
     # Extract client info
