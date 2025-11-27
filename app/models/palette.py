@@ -4,14 +4,27 @@ Palette Model
 Defines the Palette model for tracking gas bottle pallets.
 """
 
-from sqlalchemy import Column, String, Enum as SQLEnum, Float, ForeignKey, Index, Integer, Date
+from sqlalchemy import Column, String, Enum as SQLEnum, Float, ForeignKey, Index, Integer, Date, Boolean, Table, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+from datetime import datetime
 import uuid
 import enum
 
 from app.database import Base
 from app.models.mixins import TimestampMixin
+
+
+# Association table for many-to-many relationship between Palette and LivraisonDetail
+livraison_palettes = Table(
+    "livraison_palettes",
+    Base.metadata,
+    Column("livraison_detail_id", UUID(as_uuid=True), ForeignKey("livraisons_details.id", ondelete="CASCADE"), primary_key=True),
+    Column("palette_id", UUID(as_uuid=True), ForeignKey("palettes.id", ondelete="CASCADE"), primary_key=True),
+    Column("created_at", DateTime, default=datetime.utcnow),
+    Index("ix_livraison_palettes_livraison", "livraison_detail_id"),
+    Index("ix_livraison_palettes_palette", "palette_id"),
+)
 
 
 class PaletteType(str, enum.Enum):
@@ -32,19 +45,23 @@ class PaletteStatus(str, enum.Enum):
     Status of a palette in the tracking workflow.
 
     - CREATION: Palette just created
-    - EN_STOCK: Palette in factory stock
-    - EN_ROUTE: Palette in transit
-    - EN_RECEPTION: Palette arrived at destination, awaiting validation
-    - LIVREE: Palette delivered and validated
-    - RETOURNEE: Palette returned to factory
-    - OUT: Palette out of service/system
+    - AU_CENTRE: Palette at filling center (PLEINE or VIDE)
+    - EN_CHARGEMENT: Being loaded
+    - EN_ROUTE_LIVRAISON: In transit for delivery (PLEINE)
+    - AU_DEPOT: At depot (PLEINE or VIDE)
+    - EN_ROUTE_RETOUR: In transit returning to center (VIDE)
+    - EN_CONTROLE: Under quality control
+    - VALIDEE: Validated
+    - OUT: Out of service/system
     """
     CREATION = "CREATION"
-    EN_STOCK = "EN_STOCK"
-    EN_ROUTE = "EN_ROUTE"
-    EN_RECEPTION = "EN_RECEPTION"
-    LIVREE = "LIVREE"
-    RETOURNEE = "RETOURNEE"
+    AU_CENTRE = "AU_CENTRE"
+    EN_CHARGEMENT = "EN_CHARGEMENT"
+    EN_ROUTE_LIVRAISON = "EN_ROUTE_LIVRAISON"
+    AU_DEPOT = "AU_DEPOT"
+    EN_ROUTE_RETOUR = "EN_ROUTE_RETOUR"
+    EN_CONTROLE = "EN_CONTROLE"
+    VALIDEE = "VALIDEE"
     OUT = "OUT"
 
 
@@ -129,13 +146,29 @@ class Palette(Base, TimestampMixin):
         comment="Date de fabrication de la palette"
     )
 
-    # Current Partner/Location (grossiste actuel)
+    # Current Location
     current_partner_id = Column(
         UUID(as_uuid=True),
         ForeignKey("partners.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
         comment="ID du partenaire (grossiste) chez qui se trouve actuellement la palette"
+    )
+    
+    current_depot_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("depots.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="ID du dépôt où se trouve actuellement la palette"
+    )
+    
+    current_centre_remplisseur_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("centres_remplisseurs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="ID du centre remplisseur où se trouve actuellement la palette"
     )
 
     status = Column(
@@ -144,6 +177,14 @@ class Palette(Base, TimestampMixin):
         default=PaletteStatus.CREATION,
         index=True,
         comment="Current status in workflow"
+    )
+    
+    # État de la palette (PLEINE / VIDE)
+    is_full = Column(
+        Boolean,
+        default=True,
+        nullable=False,
+        comment="True if palette is full, False if empty"
     )
 
     # Geolocation
@@ -181,12 +222,21 @@ class Palette(Base, TimestampMixin):
         comment="User who created the palette"
     )
 
-    current_expedition_id = Column(
+    # Current workflow documents
+    bon_enlevement_actuel_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("expeditions.id", ondelete="SET NULL"),
+        ForeignKey("bons_enlevement.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
-        comment="Current expedition if in transit"
+        comment="Current bon d'enlèvement if in delivery transit"
+    )
+    
+    bon_retour_actuel_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("bons_reception_retour.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Current bon de réception retour if in return transit"
     )
 
     # Relationships
@@ -203,15 +253,37 @@ class Palette(Base, TimestampMixin):
         foreign_keys=[created_by_id]
     )
 
-    current_expedition = relationship(
-        "Expedition",
-        back_populates="palettes",
-        foreign_keys=[current_expedition_id]
-    )
-
     current_partner = relationship(
         "Partner",
         foreign_keys=[current_partner_id]
+    )
+    
+    current_depot = relationship(
+        "Depot",
+        foreign_keys=[current_depot_id]
+    )
+    
+    current_centre_remplisseur = relationship(
+        "CentreRemplisseur",
+        foreign_keys=[current_centre_remplisseur_id]
+    )
+    
+    bon_enlevement_actuel = relationship(
+        "BonEnlevement",
+        back_populates="palettes",
+        foreign_keys=[bon_enlevement_actuel_id]
+    )
+    
+    bon_retour_actuel = relationship(
+        "BonReceptionRetour",
+        back_populates="palettes_retournees",
+        foreign_keys=[bon_retour_actuel_id]
+    )
+    
+    livraisons = relationship(
+        "LivraisonDetail",
+        secondary=livraison_palettes,
+        back_populates="palettes_livrees"
     )
 
     movements = relationship(
@@ -233,7 +305,11 @@ class Palette(Base, TimestampMixin):
     __table_args__ = (
         Index("ix_palettes_rfid_status", "rfid_tag_id", "status"),
         Index("ix_palettes_type_status", "type", "status"),
-        Index("ix_palettes_expedition", "current_expedition_id"),
+        Index("ix_palettes_bon_enlevement", "bon_enlevement_actuel_id"),
+        Index("ix_palettes_bon_retour", "bon_retour_actuel_id"),
+        Index("ix_palettes_depot", "current_depot_id"),
+        Index("ix_palettes_centre", "current_centre_remplisseur_id"),
+        Index("ix_palettes_full_status", "is_full", "status"),
     )
 
     def __repr__(self) -> str:
@@ -247,19 +323,23 @@ class Palette(Base, TimestampMixin):
 
     def is_in_transit(self) -> bool:
         """Check if palette is currently in transit."""
-        return self.status == PaletteStatus.EN_ROUTE
+        return self.status in [PaletteStatus.EN_ROUTE_LIVRAISON, PaletteStatus.EN_ROUTE_RETOUR]
 
-    def is_delivered(self) -> bool:
-        """Check if palette has been delivered."""
-        return self.status == PaletteStatus.LIVREE
+    def is_at_center(self) -> bool:
+        """Check if palette is at filling center."""
+        return self.status == PaletteStatus.AU_CENTRE
 
-    def is_available(self) -> bool:
-        """Check if palette is available (in stock)."""
-        return self.status == PaletteStatus.EN_STOCK
+    def is_at_depot(self) -> bool:
+        """Check if palette is at depot."""
+        return self.status == PaletteStatus.AU_DEPOT
 
-    def can_be_assigned(self) -> bool:
-        """Check if palette can be assigned to an expedition."""
-        return self.status in [PaletteStatus.CREATION, PaletteStatus.EN_STOCK, PaletteStatus.RETOURNEE]
+    def can_be_assigned_for_delivery(self) -> bool:
+        """Check if palette can be assigned to a bon d'enlèvement."""
+        return self.status == PaletteStatus.AU_CENTRE and self.is_full
+
+    def can_be_returned(self) -> bool:
+        """Check if palette can be returned to center."""
+        return self.status == PaletteStatus.AU_DEPOT and not self.is_full
 
     def update_location(self, latitude: float, longitude: float, address: str = None) -> None:
         """

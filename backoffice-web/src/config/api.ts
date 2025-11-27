@@ -30,15 +30,15 @@ export const API_ENDPOINTS = {
     STATISTICS: '/api/v1/palettes/statistics',
     MOVEMENTS: (id: string) => `/api/v1/palettes/${id}/movements`,
   },
-  // Expeditions
-  EXPEDITIONS: {
-    BASE: '/api/v1/expeditions',
-    BY_ID: (id: number) => `/api/v1/expeditions/${id}`,
-    ASSIGN_PALETTES: (id: number) => `/api/v1/expeditions/${id}/palettes`,
-    DEPART: (id: number) => `/api/v1/expeditions/${id}/depart`,
-    VALIDATE: (id: number) => `/api/v1/expeditions/${id}/validate`,
-    STATISTICS: '/api/v1/expeditions/statistics/overview',
-  },
+  // Expeditions - DEPRECATED (replaced by Bons d'Enlèvement and Bons de Réception Retour)
+  // EXPEDITIONS: {
+  //   BASE: '/api/v1/expeditions',
+  //   BY_ID: (id: number) => `/api/v1/expeditions/${id}`,
+  //   ASSIGN_PALETTES: (id: number) => `/api/v1/expeditions/${id}/palettes`,
+  //   DEPART: (id: number) => `/api/v1/expeditions/${id}/depart`,
+  //   VALIDATE: (id: number) => `/api/v1/expeditions/${id}/validate`,
+  //   STATISTICS: '/api/v1/expeditions/statistics/overview',
+  // },
   // Notifications
   NOTIFICATIONS: {
     BASE: '/api/v1/notifications',
@@ -87,5 +87,57 @@ export const API_ENDPOINTS = {
   CONTACTS: {
     BASE: '/api/v1/contacts',
     BY_ID: (id: string) => `/api/v1/contacts/${id}`,
+  },
+  // Groupes
+  GROUPES: {
+    BASE: '/api/v1/groupes',
+    BY_ID: (id: string) => `/api/v1/groupes/${id}`,
+    COUNT: '/api/v1/groupes/count',
+    ACTIVATE: (id: string) => `/api/v1/groupes/${id}/activate`,
+    DEACTIVATE: (id: string) => `/api/v1/groupes/${id}/deactivate`,
+  },
+  // Centres Remplisseurs
+  CENTRES_REMPLISSEURS: {
+    BASE: '/api/v1/centres-remplisseurs',
+    BY_ID: (id: string) => `/api/v1/centres-remplisseurs/${id}`,
+    NEARBY: '/api/v1/centres-remplisseurs/nearby',
+    ACTIVATE: (id: string) => `/api/v1/centres-remplisseurs/${id}/activate`,
+    DEACTIVATE: (id: string) => `/api/v1/centres-remplisseurs/${id}/deactivate`,
+  },
+  // Dépôts
+  DEPOTS: {
+    BASE: '/api/v1/depots',
+    BY_ID: (id: string) => `/api/v1/depots/${id}`,
+    LOCATIONS: '/api/v1/depots/locations',
+    NEARBY: '/api/v1/depots/nearby',
+    ACTIVATE: (id: string) => `/api/v1/depots/${id}/activate`,
+    DEACTIVATE: (id: string) => `/api/v1/depots/${id}/deactivate`,
+    SET_MAIN: (id: string) => `/api/v1/depots/${id}/set-main`,
+  },
+  // Bons d'Enlèvement
+  BONS_ENLEVEMENT: {
+    BASE: '/api/v1/bons-enlevement',
+    BY_ID: (id: string) => `/api/v1/bons-enlevement/${id}`,
+    VALIDER: (id: string) => `/api/v1/bons-enlevement/${id}/valider`,
+    START_CHARGEMENT: (id: string) => `/api/v1/bons-enlevement/${id}/start-chargement`,
+    DEPART: (id: string) => `/api/v1/bons-enlevement/${id}/depart`,
+    START_LIVRAISON: (id: string) => `/api/v1/bons-enlevement/${id}/start-livraison`,
+    TERMINER: (id: string) => `/api/v1/bons-enlevement/${id}/terminer`,
+    ANNULER: (id: string) => `/api/v1/bons-enlevement/${id}/annuler`,
+  },
+  // Bons de Réception Retour
+  BONS_RECEPTION_RETOUR: {
+    BASE: '/api/v1/bons-reception-retour',
+    BY_ID: (id: string) => `/api/v1/bons-reception-retour/${id}`,
+    DEPART: (id: string) => `/api/v1/bons-reception-retour/${id}/depart`,
+    ARRIVEE: (id: string) => `/api/v1/bons-reception-retour/${id}/arrivee`,
+    CONTROLE: (id: string) => `/api/v1/bons-reception-retour/${id}/controle`,
+    VALIDER: (id: string) => `/api/v1/bons-reception-retour/${id}/valider`,
+    REFUSER: (id: string) => `/api/v1/bons-reception-retour/${id}/refuser`,
+  },
+  // Uploads
+  UPLOADS: {
+    LOGOS: '/api/v1/uploads/logos',
+    LOGO_BY_NAME: (filename: string) => `/api/v1/uploads/logos/${filename}`,
   },
 };

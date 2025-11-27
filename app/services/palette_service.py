@@ -545,9 +545,9 @@ class PaletteService:
             "total_palettes": total_palettes,
             "by_type": by_type,
             "by_status": by_status,
-            "in_stock": by_status.get("EN_STOCK", 0),
-            "in_transit": by_status.get("EN_ROUTE", 0),
-            "delivered": by_status.get("LIVREE", 0)
+            "in_stock": by_status.get("AU_DEPOT", 0) + by_status.get("AU_CENTRE", 0),
+            "in_transit": by_status.get("EN_ROUTE_LIVRAISON", 0) + by_status.get("EN_ROUTE_RETOUR", 0),
+            "delivered": by_status.get("AU_DEPOT", 0)
         }
 
     @staticmethod
@@ -564,12 +564,14 @@ class PaletteService:
         """
         # Define allowed transitions
         allowed_transitions = {
-            PaletteStatus.CREATION: [PaletteStatus.EN_STOCK, PaletteStatus.OUT],
-            PaletteStatus.EN_STOCK: [PaletteStatus.EN_ROUTE, PaletteStatus.OUT],
-            PaletteStatus.EN_ROUTE: [PaletteStatus.EN_RECEPTION, PaletteStatus.EN_STOCK],
-            PaletteStatus.EN_RECEPTION: [PaletteStatus.LIVREE, PaletteStatus.EN_ROUTE],
-            PaletteStatus.LIVREE: [PaletteStatus.RETOURNEE, PaletteStatus.OUT],
-            PaletteStatus.RETOURNEE: [PaletteStatus.EN_STOCK, PaletteStatus.OUT],
+            PaletteStatus.CREATION: [PaletteStatus.AU_CENTRE, PaletteStatus.OUT],
+            PaletteStatus.AU_CENTRE: [PaletteStatus.EN_CHARGEMENT, PaletteStatus.OUT],
+            PaletteStatus.EN_CHARGEMENT: [PaletteStatus.EN_ROUTE_LIVRAISON, PaletteStatus.AU_CENTRE],
+            PaletteStatus.EN_ROUTE_LIVRAISON: [PaletteStatus.AU_DEPOT, PaletteStatus.OUT],
+            PaletteStatus.AU_DEPOT: [PaletteStatus.EN_ROUTE_RETOUR, PaletteStatus.OUT],
+            PaletteStatus.EN_ROUTE_RETOUR: [PaletteStatus.EN_CONTROLE, PaletteStatus.AU_DEPOT],
+            PaletteStatus.EN_CONTROLE: [PaletteStatus.VALIDEE, PaletteStatus.AU_DEPOT],
+            PaletteStatus.VALIDEE: [PaletteStatus.AU_CENTRE, PaletteStatus.OUT],
             PaletteStatus.OUT: [],  # Terminal state
         }
 

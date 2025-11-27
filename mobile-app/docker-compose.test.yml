@@ -1,0 +1,76 @@
+services:
+  # Backend API pour les tests
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: gaztracker-api-test
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENVIRONMENT=development
+      - DEBUG=True
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=gaztracker_test
+      - POSTGRES_USER=gaztracker_user
+      - POSTGRES_PASSWORD=test_password
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ../app:/app/app
+    networks:
+      - gaztracker-network
+
+  # Base de données PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: gaztracker-postgres-test
+    environment:
+      - POSTGRES_DB=gaztracker_test
+      - POSTGRES_USER=gaztracker_user
+      - POSTGRES_PASSWORD=test_password
+    ports:
+      - "5433:5432"  # Port différent pour éviter les conflits
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    networks:
+      - gaztracker-network
+
+  # Redis pour le cache
+  redis:
+    image: redis:7-alpine
+    container_name: gaztracker-redis-test
+    ports:
+      - "6380:6379"  # Port différent pour éviter les conflits
+    networks:
+      - gaztracker-network
+
+  # Service pour tester l'API (healthcheck)
+  api-test:
+    image: curlimages/curl:latest
+    container_name: gaztracker-api-healthcheck
+    depends_on:
+      - api
+    command: >
+      sh -c "
+        echo 'Waiting for API to be ready...' &&
+        sleep 10 &&
+        curl -f http://api:8000/health || exit 1 &&
+        echo 'API is ready!' &&
+        curl -f http://api:8000/api/v1/health || exit 1 &&
+        echo 'API endpoints are working!'
+      "
+    networks:
+      - gaztracker-network
+
+volumes:
+  postgres_test_data:
+
+networks:
+  gaztracker-network:
+    driver: bridge
+

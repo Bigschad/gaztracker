@@ -11,7 +11,7 @@ from typing import Optional
 from uuid import UUID
 import math
 
-from app.database import get_db
+from app.database import get_sync_db
 from app.models.user import User
 from app.models.notification import NotificationType, NotificationStatus, NotificationChannel
 from app.schemas.notification import (
@@ -24,7 +24,7 @@ from app.schemas.notification import (
     NotificationStatistics
 )
 from app.services.notification_service import NotificationService
-from app.middleware.auth_middleware import get_current_user
+from app.middleware.auth_middleware import get_current_user_sync
 from app.middleware.rbac import require_role
 from app.utils.exceptions import (
     ResourceNotFoundException,
@@ -45,7 +45,7 @@ router = APIRouter()
 )
 async def create_notification(
     notification_create: NotificationCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
@@ -76,7 +76,7 @@ async def create_notification(
 )
 async def send_notification_now(
     notification_create: NotificationCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
@@ -110,7 +110,7 @@ async def send_notification_now(
 )
 async def send_email(
     email_data: NotificationSendEmail,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
@@ -144,7 +144,7 @@ async def send_email(
 )
 async def send_sms(
     sms_data: NotificationSendSMS,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
@@ -180,8 +180,8 @@ async def list_notifications(
     channel_filter: Optional[NotificationChannel] = Query(None, alias="channel", description="Filter by channel"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_sync_db),
+    current_user: User = Depends(get_current_user_sync)
 ):
     """
     List all notifications with pagination and filters.
@@ -219,8 +219,8 @@ async def list_notifications(
 )
 async def get_notification(
     notification_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_sync_db),
+    current_user: User = Depends(get_current_user_sync)
 ):
     """
     Get details of a specific notification by ID.
@@ -244,7 +244,7 @@ async def get_notification(
 )
 async def send_notification(
     notification_id: UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
@@ -277,7 +277,7 @@ async def send_notification(
 )
 async def retry_failed_notifications(
     max_retries: int = Query(3, ge=1, le=10, description="Maximum retry attempts"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN"]))
 ):
     """
@@ -304,7 +304,7 @@ async def retry_failed_notifications(
     description="Get statistical overview of all notifications."
 )
 async def get_statistics(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
@@ -331,7 +331,7 @@ async def get_statistics(
     description="Manually trigger check for delayed expeditions and send alerts."
 )
 async def check_delayed_expeditions(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
@@ -356,7 +356,7 @@ async def check_delayed_expeditions(
     description="Manually trigger check for pending validations and send reminders."
 )
 async def check_pending_validations(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
@@ -381,7 +381,7 @@ async def check_pending_validations(
     description="Run all automatic alert checks (delays, validations, etc.)."
 )
 async def run_all_checks(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     current_user: User = Depends(require_role(["ADMIN"]))
 ):
     """

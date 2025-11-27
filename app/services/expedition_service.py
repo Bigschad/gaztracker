@@ -371,7 +371,7 @@ class ExpeditionService:
 
         for palette in palettes:
             old_status = palette.status
-            palette.status = PaletteStatus.EN_ROUTE
+            palette.status = PaletteStatus.EN_ROUTE_LIVRAISON
 
             # Create movement history
             movement = PaletteMovement(
@@ -379,7 +379,7 @@ class ExpeditionService:
                 expedition_id=expedition_id,
                 action=MovementAction.EXPEDITION_DEPARTED,
                 status_before=old_status,
-                status_after=PaletteStatus.EN_ROUTE,
+                status_after=PaletteStatus.EN_ROUTE_LIVRAISON.value,
                 performed_by_id=current_user.id,
                 notes=f"Expedition {expedition.reference_number} departed"
             )
@@ -447,7 +447,7 @@ class ExpeditionService:
 
         for palette in palettes:
             old_status = palette.status
-            palette.status = PaletteStatus.LIVREE
+            palette.status = PaletteStatus.AU_DEPOT
 
             # Create movement history
             movement = PaletteMovement(
@@ -455,7 +455,7 @@ class ExpeditionService:
                 expedition_id=expedition_id,
                 action=MovementAction.DELIVERED,
                 status_before=old_status,
-                status_after=PaletteStatus.LIVREE,
+                status_after=PaletteStatus.AU_DEPOT.value,
                 performed_by_id=current_user.id,
                 notes=f"Expedition {expedition.reference_number} delivered and validated"
             )
@@ -511,7 +511,7 @@ class ExpeditionService:
 
         for palette in palettes:
             palette_old_status = palette.status
-            palette.status = PaletteStatus.EN_STOCK
+            palette.status = PaletteStatus.AU_DEPOT
             palette.current_expedition_id = None
 
             # Create movement history
@@ -520,7 +520,7 @@ class ExpeditionService:
                 expedition_id=expedition_id,
                 action=MovementAction.EXPEDITION_CANCELLED,
                 status_before=palette_old_status,
-                status_after=PaletteStatus.EN_STOCK,
+                status_after=PaletteStatus.AU_DEPOT.value,
                 performed_by_id=current_user.id,
                 notes=f"Expedition {expedition.reference_number} cancelled: {reason}"
             )
@@ -557,7 +557,7 @@ class ExpeditionService:
             by_status[status.value] = count
 
         in_transit = by_status.get("EN_TRANSIT", 0)
-        delivered = by_status.get("LIVREE", 0)
+        delivered = by_status.get("AU_DEPOT", 0)
 
         # Count delayed expeditions (past ETA and not delivered)
         delayed = db.query(func.count(Expedition.id)).filter(
@@ -621,7 +621,7 @@ class ExpeditionService:
             # Assign palette to expedition
             old_status = palette.status
             palette.current_expedition_id = expedition.id
-            palette.status = PaletteStatus.EN_STOCK  # Keep in stock until departure
+            palette.status = PaletteStatus.AU_DEPOT  # Keep in stock until departure
 
             # Create movement history
             movement = PaletteMovement(

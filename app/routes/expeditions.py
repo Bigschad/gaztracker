@@ -24,7 +24,7 @@ from app.schemas.expedition import (
     ExpeditionStatistics
 )
 from app.services.expedition_service import ExpeditionService
-from app.middleware.auth_middleware import get_current_user
+from app.middleware.auth_middleware import get_current_user_sync
 from app.middleware.rbac import require_role
 from app.utils.exceptions import (
     ResourceNotFoundException,
@@ -84,7 +84,7 @@ async def list_expeditions(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     db: Session = Depends(get_sync_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_sync)
 ):
     """
     List all expeditions with pagination and filters.
@@ -123,7 +123,7 @@ async def list_expeditions(
 async def get_expedition(
     expedition_id: UUID,
     db: Session = Depends(get_sync_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_sync)
 ):
     """
     Get details of a specific expedition by ID.

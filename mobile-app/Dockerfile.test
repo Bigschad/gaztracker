@@ -1,0 +1,36 @@
+# Dockerfile pour environnement de test mobile
+FROM node:18-alpine
+
+# Installer les dépendances système
+RUN apk add --no-cache \
+    git \
+    curl \
+    bash \
+    python3 \
+    make \
+    g++
+
+# Installer Expo CLI globalement
+RUN npm install -g expo-cli@latest
+
+# Créer le répertoire de travail
+WORKDIR /app
+
+# Copier les fichiers de configuration
+COPY package*.json ./
+COPY tsconfig.json ./
+COPY app.json ./
+COPY babel.config.js ./
+
+# Installer les dépendances
+RUN npm install
+
+# Copier le code source
+COPY . .
+
+# Exposer le port Expo
+EXPOSE 19000 19001 19002
+
+# Commande par défaut
+CMD ["npm", "start"]
+

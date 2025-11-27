@@ -278,19 +278,21 @@ class Expedition(Base, TimestampMixin):
         remote_side="Contact.id"
     )
 
-    palettes = relationship(
-        "Palette",
-        back_populates="current_expedition",
-        foreign_keys="Palette.current_expedition_id",
-        lazy="dynamic"
-    )
+    # Note: This relationship is deprecated. Palettes now use bon_enlevement_actuel_id instead.
+    # palettes = relationship(
+    #     "Palette",
+    #     back_populates="current_expedition",
+    #     foreign_keys="Palette.current_expedition_id",
+    #     lazy="dynamic"
+    # )
 
-    movements = relationship(
-        "PaletteMovement",
-        back_populates="expedition",
-        cascade="all, delete-orphan",
-        lazy="dynamic"
-    )
+    # Note: This relationship is deprecated. Movements now reference bons_enlevement directly.
+    # movements = relationship(
+    #     "PaletteMovement",
+    #     back_populates="expedition",
+    #     cascade="all, delete-orphan",
+    #     lazy="dynamic"
+    # )
 
     notifications = relationship(
         "Notification",

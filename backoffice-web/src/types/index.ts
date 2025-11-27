@@ -8,3 +8,8 @@ export * from './reports';
 export * from './rfidTag';
 export * from './partner';
 export * from './contact';
+export * from './groupe';
+export * from './centreRemplisseur';
+export * from './depot';
+export * from './bonEnlevement';
+export * from './bonReceptionRetour';

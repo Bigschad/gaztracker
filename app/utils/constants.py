@@ -49,12 +49,14 @@ RFID_LENGTH = 12
 
 # Palette status workflow transitions (allowed transitions)
 PALETTE_STATUS_TRANSITIONS = {
-    PaletteStatus.CREATION: [PaletteStatus.EN_STOCK, PaletteStatus.OUT],
-    PaletteStatus.EN_STOCK: [PaletteStatus.EN_ROUTE, PaletteStatus.OUT],
-    PaletteStatus.EN_ROUTE: [PaletteStatus.EN_RECEPTION, PaletteStatus.OUT],
-    PaletteStatus.EN_RECEPTION: [PaletteStatus.LIVREE, PaletteStatus.EN_ROUTE],
-    PaletteStatus.LIVREE: [PaletteStatus.RETOURNEE, PaletteStatus.OUT],
-    PaletteStatus.RETOURNEE: [PaletteStatus.EN_STOCK, PaletteStatus.OUT],
+    PaletteStatus.CREATION: [PaletteStatus.AU_CENTRE, PaletteStatus.OUT],
+    PaletteStatus.AU_CENTRE: [PaletteStatus.EN_CHARGEMENT, PaletteStatus.OUT],
+    PaletteStatus.EN_CHARGEMENT: [PaletteStatus.EN_ROUTE_LIVRAISON, PaletteStatus.AU_CENTRE],
+    PaletteStatus.EN_ROUTE_LIVRAISON: [PaletteStatus.AU_DEPOT, PaletteStatus.OUT],
+    PaletteStatus.AU_DEPOT: [PaletteStatus.EN_ROUTE_RETOUR, PaletteStatus.OUT],
+    PaletteStatus.EN_ROUTE_RETOUR: [PaletteStatus.EN_CONTROLE, PaletteStatus.AU_DEPOT],
+    PaletteStatus.EN_CONTROLE: [PaletteStatus.VALIDEE, PaletteStatus.AU_DEPOT],
+    PaletteStatus.VALIDEE: [PaletteStatus.AU_CENTRE, PaletteStatus.OUT],
     PaletteStatus.OUT: [],  # Terminal state
 }
 

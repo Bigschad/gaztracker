@@ -11,7 +11,7 @@ from uuid import UUID
 import math
 
 from app.database import get_sync_db
-from app.middleware.auth_middleware import get_current_user
+from app.middleware.auth_middleware import get_current_user_sync
 from app.models.user import User, UserRole
 from app.models.partner import Partner, PartnerType
 from app.schemas.partner import (
@@ -76,7 +76,7 @@ def list_partners(
     type: Optional[str] = Query(None, description="Filter by partner type (GROSSISTE, FOURNISSEUR, TRANSPORTEUR, AUTRE)"),
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
     search: Optional[str] = Query(None, description="Search in name, email, phone"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_sync),
     db: Session = Depends(get_sync_db)
 ) -> PartnerListResponse:
     """
@@ -148,7 +148,7 @@ def list_partners(
 )
 def get_partner(
     partner_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_sync),
     db: Session = Depends(get_sync_db)
 ) -> PartnerResponse:
     """

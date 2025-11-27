@@ -11,7 +11,7 @@ from uuid import UUID
 import math
 
 from app.database import get_sync_db
-from app.middleware.auth_middleware import get_current_user
+from app.middleware.auth_middleware import get_current_user_sync
 from app.models.user import User, UserRole
 from app.models.contact import Contact
 from app.models.partner import Partner
@@ -84,7 +84,7 @@ def list_contacts(
     partner_id: Optional[UUID] = Query(None, description="Filter by partner ID"),
     is_primary: Optional[bool] = Query(None, description="Filter by primary status"),
     search: Optional[str] = Query(None, description="Search in name, email, phone"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_sync),
     db: Session = Depends(get_sync_db)
 ) -> ContactListResponse:
     """
@@ -146,7 +146,7 @@ def list_contacts(
 )
 def get_contact(
     contact_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_sync),
     db: Session = Depends(get_sync_db)
 ) -> ContactResponse:
     """

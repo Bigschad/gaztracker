@@ -4,7 +4,7 @@ Partner Model
 Defines the Partner model for storing partner information (grossistes, suppliers, etc.).
 """
 
-from sqlalchemy import Column, String, Boolean, Enum as SQLEnum, Index
+from sqlalchemy import Column, String, Boolean, Enum as SQLEnum, Index, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
@@ -19,12 +19,12 @@ class PartnerType(str, enum.Enum):
     Partner types.
     
     - GROSSISTE: Wholesaler/distributor
-    - FOURNISSEUR: Supplier
+    - REVENDEUR: Reseller (client of grossiste)
     - TRANSPORTEUR: Transport company
     - AUTRE: Other
     """
     GROSSISTE = "GROSSISTE"
-    FOURNISSEUR = "FOURNISSEUR"
+    REVENDEUR = "REVENDEUR"
     TRANSPORTEUR = "TRANSPORTEUR"
     AUTRE = "AUTRE"
 
@@ -37,12 +37,16 @@ class Partner(Base, TimestampMixin):
         id: Unique partner identifier (UUID)
         name: Partner name (company name)
         type: Partner type (enum)
+        code: Unique code (client ID)
+        parent_grossiste_id: FK to parent grossiste (for REVENDEUR only)
         address: Partner address
         city: City
         postal_code: Postal code
         country: Country
         phone: Phone number
         email: Email address
+        contact_name: Contact person name
+        contact_phone: Contact person phone
         is_active: Whether the partner is active
         notes: Additional notes
         created_at: Timestamp when partner was created
@@ -77,6 +81,23 @@ class Partner(Base, TimestampMixin):
         comment="Partner type"
     )
     
+    code = Column(
+        String(50),
+        unique=True,
+        nullable=True,
+        index=True,
+        comment="Unique code (client ID)"
+    )
+    
+    # For REVENDEUR: link to parent grossiste
+    parent_grossiste_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("partners.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="FK to parent grossiste (for REVENDEUR only)"
+    )
+    
     # Address Information
     address = Column(
         String(500),
@@ -99,7 +120,7 @@ class Partner(Base, TimestampMixin):
     country = Column(
         String(100),
         nullable=True,
-        default="France",
+        default="Côte d'Ivoire",
         comment="Country"
     )
     
@@ -116,6 +137,18 @@ class Partner(Base, TimestampMixin):
         nullable=True,
         index=True,
         comment="Email address"
+    )
+    
+    contact_name = Column(
+        String(255),
+        nullable=True,
+        comment="Contact person name"
+    )
+    
+    contact_phone = Column(
+        String(20),
+        nullable=True,
+        comment="Contact person phone"
     )
     
     # Status
@@ -149,10 +182,67 @@ class Partner(Base, TimestampMixin):
         lazy="dynamic"
     )
     
+    # New relationships for corrected structure
+    parent_grossiste = relationship(
+        "Partner",
+        remote_side=[id],
+        back_populates="revendeurs",
+        foreign_keys=[parent_grossiste_id]
+    )
+    
+    revendeurs = relationship(
+        "Partner",
+        back_populates="parent_grossiste",
+        foreign_keys=[parent_grossiste_id]
+    )
+    
+    depots = relationship(
+        "Depot",
+        back_populates="partner",
+        cascade="all, delete-orphan",
+        lazy="dynamic"
+    )
+    
+    livraisons_details = relationship(
+        "LivraisonDetail",
+        back_populates="revendeur",
+        foreign_keys="LivraisonDetail.revendeur_id",
+        lazy="dynamic"
+    )
+    
+    bons_enlevement = relationship(
+        "BonEnlevement",
+        back_populates="grossiste",
+        foreign_keys="BonEnlevement.grossiste_id",
+        lazy="dynamic"
+    )
+    
+    livraisons_details = relationship(
+        "LivraisonDetail",
+        back_populates="revendeur",
+        foreign_keys="LivraisonDetail.revendeur_id",
+        lazy="dynamic"
+    )
+    
+    bons_reception_retour = relationship(
+        "BonReceptionRetour",
+        back_populates="grossiste",
+        foreign_keys="BonReceptionRetour.grossiste_id",
+        lazy="dynamic"
+    )
+    
+    palettes = relationship(
+        "Palette",
+        back_populates="current_partner",
+        foreign_keys="Palette.current_partner_id",
+        lazy="dynamic"
+    )
+    
     # Indexes
     __table_args__ = (
         Index("ix_partners_name_active", "name", "is_active"),
         Index("ix_partners_type_active", "type", "is_active"),
+        Index("ix_partners_parent", "parent_grossiste_id"),
     )
     
     def __repr__(self) -> str:
