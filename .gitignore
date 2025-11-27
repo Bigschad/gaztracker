@@ -31,6 +31,12 @@ ENV/
 .env.local
 .env.*.local
 
+# Fichiers .env de production (ne pas commiter)
+.env.app
+.env.db
+.env.redis
+.env.frontend
+
 # IDE
 .vscode/
 .idea/
@@ -130,6 +136,10 @@ mobile-app/**/ios/Flutter/app.zip
 mobile-app/**/ios/Flutter/flutter_assets/
 mobile-app/**/ios/ServiceDefinitions.json
 mobile-app/**/ios/Runner/GeneratedPluginRegistrant.*
+
+# Node modules (all)
+node_modules/
+backoffice-web/node_modules/
 
 # Mobile App (React Native)
 mobile-app/**/node_modules/

@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - develop
+      - dev  # Branche de déploiement production
   workflow_dispatch: # Permet le déclenchement manuel
 
 env:
@@ -22,12 +23,14 @@ jobs:
         
       - name: Set environment based on branch
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
             echo "ENVIRONMENT=production" >> $GITHUB_ENV
             echo "DEPLOY_PATH=/opt/gaztracker" >> $GITHUB_ENV
+            echo "COMPOSE_FILE=docker-compose.prod.yml" >> $GITHUB_ENV
           else
             echo "ENVIRONMENT=recette" >> $GITHUB_ENV
             echo "DEPLOY_PATH=/opt/gaztracker-recette" >> $GITHUB_ENV
+            echo "COMPOSE_FILE=docker-compose.yml" >> $GITHUB_ENV
           fi
       
       - name: Configure SSH
@@ -68,25 +71,57 @@ jobs:
           # Variables
           DEPLOY_PATH="${{ env.DEPLOY_PATH }}"
           ENV="${{ env.ENVIRONMENT }}"
+          COMPOSE_FILE="${{ env.COMPOSE_FILE }}"
           
           echo "🚀 Déploiement de GazTracker - Environnement: $ENV"
+          echo "📄 Compose file: $COMPOSE_FILE"
           
           # Créer le répertoire si nécessaire
           sudo mkdir -p $DEPLOY_PATH
           sudo chown -R $USER:$USER $DEPLOY_PATH
           
-          # Backup de la configuration actuelle
-          if [ -f "$DEPLOY_PATH/.env" ]; then
-            cp $DEPLOY_PATH/.env /tmp/.env.backup
+          # Backup de toutes les configurations
+          if [ -f "$DEPLOY_PATH/.env.app" ]; then
+            cp $DEPLOY_PATH/.env.app /tmp/.env.app.backup
+          fi
+          if [ -f "$DEPLOY_PATH/.env.db" ]; then
+            cp $DEPLOY_PATH/.env.db /tmp/.env.db.backup
+          fi
+          if [ -f "$DEPLOY_PATH/.env.redis" ]; then
+            cp $DEPLOY_PATH/.env.redis /tmp/.env.redis.backup
+          fi
+          if [ -f "$DEPLOY_PATH/.env.frontend" ]; then
+            cp $DEPLOY_PATH/.env.frontend /tmp/.env.frontend.backup
           fi
           
           # Extraire la nouvelle version
           cd $DEPLOY_PATH
           tar -xzf /tmp/deploy.tar.gz
           
-          # Restaurer la config
-          if [ -f "/tmp/.env.backup" ]; then
-            cp /tmp/.env.backup $DEPLOY_PATH/.env
+          # Restaurer les configs
+          if [ -f "/tmp/.env.app.backup" ]; then
+            cp /tmp/.env.app.backup $DEPLOY_PATH/.env.app
+          fi
+          if [ -f "/tmp/.env.db.backup" ]; then
+            cp /tmp/.env.db.backup $DEPLOY_PATH/.env.db
+          fi
+          if [ -f "/tmp/.env.redis.backup" ]; then
+            cp /tmp/.env.redis.backup $DEPLOY_PATH/.env.redis
+          fi
+          if [ -f "/tmp/.env.frontend.backup" ]; then
+            cp /tmp/.env.frontend.backup $DEPLOY_PATH/.env.frontend
+          fi
+          
+          # Vérifier que les fichiers .env existent pour la production
+          if [ "$ENV" == "production" ]; then
+            if [ ! -f "$DEPLOY_PATH/.env.app" ]; then
+              echo "⚠️  Création des fichiers .env depuis les exemples..."
+              cp $DEPLOY_PATH/.env.app.example $DEPLOY_PATH/.env.app || true
+              cp $DEPLOY_PATH/.env.db.example $DEPLOY_PATH/.env.db || true
+              cp $DEPLOY_PATH/.env.redis.example $DEPLOY_PATH/.env.redis || true
+              cp $DEPLOY_PATH/.env.frontend.example $DEPLOY_PATH/.env.frontend || true
+              echo "⚠️  ATTENTION: Configurez les fichiers .env avant le premier démarrage!"
+            fi
           fi
           
           # Nettoyer
@@ -94,14 +129,14 @@ jobs:
           
           # Arrêter les containers existants
           echo "⏹️  Arrêt des containers..."
-          sudo docker-compose down || true
+          sudo docker-compose -f $COMPOSE_FILE down || true
           
           # Build et démarrage
           echo "🔨 Build des images Docker..."
-          sudo docker-compose build --no-cache
+          sudo docker-compose -f $COMPOSE_FILE build --no-cache
           
           echo "▶️  Démarrage des containers..."
-          sudo docker-compose up -d
+          sudo docker-compose -f $COMPOSE_FILE up -d
           
           # Attendre que les services soient prêts
           echo "⏳ Attente du démarrage des services..."
@@ -109,11 +144,11 @@ jobs:
           
           # Vérifier l'état
           echo "✅ Vérification de l'état des services..."
-          sudo docker-compose ps
+          sudo docker-compose -f $COMPOSE_FILE ps
           
           # Afficher les logs des services
           echo "📋 Logs des services:"
-          sudo docker-compose logs --tail=20
+          sudo docker-compose -f $COMPOSE_FILE logs --tail=20
           
           # Nettoyage des images inutilisées
           echo "🧹 Nettoyage..."
