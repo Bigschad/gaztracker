@@ -54,8 +54,20 @@ wait_for_redis
 
 # Run database migrations
 echo "🔄 Running database migrations..."
+echo "   Checking current database state..."
+alembic current || echo "   No migrations applied yet"
+
+echo "   Applying migrations..."
 alembic upgrade heads
-echo "✅ Migrations completed!"
+
+if [ $? -eq 0 ]; then
+    echo "✅ Migrations completed successfully!"
+    echo "   Current revision:"
+    alembic current
+else
+    echo "❌ Migration failed!"
+    exit 1
+fi
 
 # Execute the main command
 echo "🎯 Starting application server..."
