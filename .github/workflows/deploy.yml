@@ -24,8 +24,8 @@ jobs:
         
       - name: Set environment based on branch or tag
         run: |
-          if [[ "${{ github.ref }}" == "refs/tags/devfast" ]]; then
-            echo "ENVIRONMENT=development" >> $GITHUB_ENV
+          if [[ "${{ github.ref }}" == "refs/tags/devfast" ]] || [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "ENVIRONMENT=production" >> $GITHUB_ENV
             echo "DEPLOY_PATH=/opt/gaztracker" >> $GITHUB_ENV
           else
             echo "ENVIRONMENT=recette" >> $GITHUB_ENV
@@ -172,7 +172,7 @@ jobs:
         run: |
           echo "✅ Déploiement réussi sur ${{ env.ENVIRONMENT }}"
           echo "🔗 Backend: http://${{ secrets.LIGHTSAIL_HOST }}:8000"
-          echo "🔗 Frontend: http://${{ secrets.LIGHTSAIL_HOST }}:3000"
+          echo "🔗 Frontend: http://${{ secrets.LIGHTSAIL_HOST }}"
       
       - name: Notification on failure
         if: failure()
