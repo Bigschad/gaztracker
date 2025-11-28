@@ -215,13 +215,20 @@ jobs:
           
           # Exécuter les migrations Alembic seulement si le container est stable
           if [ "$CONTAINER_STABLE" = true ]; then
+            echo "🔨 Force la création des tables manquantes (sécurité)..."
+            if sudo docker-compose exec -T app python scripts/force_create_tables.py; then
+                echo "✅ Tables vérifiées/créées"
+            else
+                echo "⚠️  Erreur lors de la création forcée des tables"
+            fi
+            
             echo "🔄 Exécution des migrations Alembic..."
             if sudo docker-compose exec -T app alembic upgrade heads; then
-            echo "✅ Migrations appliquées avec succès!"
-            # Afficher l'état actuel
-            echo "📊 État actuel des migrations:"
-            sudo docker-compose exec -T app alembic current || true
-          else
+              echo "✅ Migrations appliquées avec succès!"
+              # Afficher l'état actuel
+              echo "📊 État actuel des migrations:"
+              sudo docker-compose exec -T app alembic current || true
+            else
             echo "⚠️  Erreur lors des migrations"
             echo "📋 Logs des migrations:"
             sudo docker-compose logs app | grep -i "alembic\|migration\|KeyError" | tail -30 || true
