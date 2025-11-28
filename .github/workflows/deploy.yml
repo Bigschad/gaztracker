@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - develop
+    tags:
+      - 'devfast'  # Tag pour déploiement rapide en production
   workflow_dispatch: # Permet le déclenchement manuel
 
 env:
@@ -20,9 +22,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: Set environment based on branch
+      - name: Set environment based on branch or tag
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == "refs/tags/devfast" ]]; then
             echo "ENVIRONMENT=production" >> $GITHUB_ENV
             echo "DEPLOY_PATH=/opt/gaztracker" >> $GITHUB_ENV
           else
