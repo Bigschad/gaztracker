@@ -131,22 +131,60 @@ jobs:
           
           # Attendre que les services soient prêts
           echo "⏳ Attente du démarrage des services..."
-          sleep 15
+          sleep 20
           
-          # Vérifier si la base de données est prête
-          echo "🔍 Vérification de la connexion à la base de données..."
-          for i in {1..30}; do
-            if sudo docker-compose exec -T app python -c "from app.database import db_manager; db_manager.init_db(); print('OK')" 2>/dev/null; then
-              echo "✅ Base de données accessible"
+          # Vérifier que le container app est stable (pas en redémarrage)
+          echo "🔍 Vérification de l'état du container app..."
+          MAX_WAIT=60
+          WAIT_COUNT=0
+          CONTAINER_STABLE=false
+          
+          while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
+            CONTAINER_STATUS=$(sudo docker-compose ps app 2>/dev/null | grep -E "Up|Restarting|Exited" | awk '{print $4}' || echo "unknown")
+            
+            if [ "$CONTAINER_STATUS" = "Up" ]; then
+              # Vérifier que le container répond
+              if sudo docker-compose exec -T app echo "OK" > /dev/null 2>&1; then
+                echo "✅ Container app est stable et répond"
+                CONTAINER_STABLE=true
+                break
+              fi
+            elif [ "$CONTAINER_STATUS" = "Restarting" ]; then
+              echo "   ⚠️  Container en redémarrage... (attente $WAIT_COUNT/$MAX_WAIT)"
+            elif [ "$CONTAINER_STATUS" = "Exited" ]; then
+              echo "   ⚠️  Container arrêté, vérification des logs..."
+              sudo docker-compose logs --tail=30 app
+              echo "   💡 Le container a probablement échoué à cause des migrations"
               break
             fi
-            if [ $i -eq 30 ]; then
-              echo "⚠️  Base de données non accessible après 30 tentatives"
-            else
-              echo "   Tentative $i/30..."
-              sleep 2
-            fi
+            
+            WAIT_COUNT=$((WAIT_COUNT + 1))
+            sleep 2
           done
+          
+          if [ "$CONTAINER_STABLE" = false ]; then
+            echo "⚠️  Container app n'est pas stable après $MAX_WAIT secondes"
+            echo "📋 Logs du container:"
+            sudo docker-compose logs --tail=50 app
+            echo ""
+            echo "💡 Le container redémarre probablement à cause des migrations"
+            echo "   Les migrations seront appliquées après correction manuelle"
+          else
+            # Vérifier si la base de données est prête
+            echo "🔍 Vérification de la connexion à la base de données..."
+            for i in {1..30}; do
+              if sudo docker-compose exec -T app python -c "from app.database import db_manager; db_manager.init_db(); print('OK')" 2>/dev/null; then
+                echo "✅ Base de données accessible"
+                break
+              fi
+              if [ $i -eq 30 ]; then
+                echo "⚠️  Base de données non accessible après 30 tentatives"
+              else
+                echo "   Tentative $i/30..."
+                sleep 2
+              fi
+            done
+          fi
           
           # Nettoyer les migrations problématiques avant d'appliquer
           echo "🔧 Nettoyage des migrations problématiques..."
@@ -168,9 +206,10 @@ jobs:
             fi
           fi
           
-          # Exécuter les migrations Alembic
-          echo "🔄 Exécution des migrations Alembic..."
-          if sudo docker-compose exec -T app alembic upgrade heads; then
+          # Exécuter les migrations Alembic seulement si le container est stable
+          if [ "$CONTAINER_STABLE" = true ]; then
+            echo "🔄 Exécution des migrations Alembic..."
+            if sudo docker-compose exec -T app alembic upgrade heads; then
             echo "✅ Migrations appliquées avec succès!"
             # Afficher l'état actuel
             echo "📊 État actuel des migrations:"
@@ -189,6 +228,13 @@ jobs:
             echo "      docker-compose exec app alembic stamp <revision>"
             # Ne pas faire échouer le déploiement pour une erreur de migration
             # L'utilisateur peut corriger manuellement
+          fi
+          else
+            echo "⚠️  Migrations non exécutées - container instable"
+            echo "💡 Corrigez les migrations manuellement, puis redémarrez:"
+            echo "   bash scripts/fix_alembic_revisions.sh"
+            echo "   docker-compose restart app"
+            echo "   docker-compose exec app alembic upgrade heads"
           fi
           
           # Vérifier l'état
