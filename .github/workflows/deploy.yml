@@ -2,9 +2,9 @@ name: Deploy to Lightsail
 
 on:
   push:
-    branches:
-      - main
-      - develop
+    # branches:
+      # - main
+      # - develop
     tags:
       - 'devfast'  # Tag pour déploiement rapide en production
   workflow_dispatch: # Permet le déclenchement manuel
@@ -24,8 +24,8 @@ jobs:
         
       - name: Set environment based on branch or tag
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == "refs/tags/devfast" ]]; then
-            echo "ENVIRONMENT=production" >> $GITHUB_ENV
+          if [[ "${{ github.ref }}" == "refs/tags/devfast" ]]; then
+            echo "ENVIRONMENT=development" >> $GITHUB_ENV
             echo "DEPLOY_PATH=/opt/gaztracker" >> $GITHUB_ENV
           else
             echo "ENVIRONMENT=recette" >> $GITHUB_ENV
@@ -82,6 +82,10 @@ jobs:
             cp $DEPLOY_PATH/.env /tmp/.env.backup
           fi
           
+          if [ -f "$DEPLOY_PATH/docker-compose.yml" ]; then
+            cp $DEPLOY_PATH/docker-compose.yml /tmp/docker-compose.yml.backup
+          fi
+
           # Extraire la nouvelle version
           cd $DEPLOY_PATH
           tar -xzf /tmp/deploy.tar.gz
@@ -89,6 +93,10 @@ jobs:
           # Restaurer la config
           if [ -f "/tmp/.env.backup" ]; then
             cp /tmp/.env.backup $DEPLOY_PATH/.env
+          fi
+          
+          if [ -f "/tmp/docker-compose.yml.backup" ]; then
+            cp /tmp/docker-compose.yml.backup $DEPLOY_PATH/docker-compose.yml
           fi
           
           # Nettoyer

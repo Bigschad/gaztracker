@@ -64,6 +64,7 @@ alembic/versions/*.pyc
 
 # Docker
 *.env.docker
+docker-compose.*
 
 # Uploads
 uploads/
@@ -71,6 +72,8 @@ media/
 
 # Documentation
 docs/_build/
+docs/
+docs/*
 
 # Jupyter Notebook
 .ipynb_checkpoints
