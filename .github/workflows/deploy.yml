@@ -126,6 +126,10 @@ jobs:
           echo "⏳ Attente du démarrage des services..."
           sleep 15
           
+          # Exécuter les migrations Alembic
+          echo "🔄 Exécution des migrations Alembic..."
+          sudo docker-compose exec -T app alembic upgrade heads || echo "⚠️  Migrations déjà à jour ou erreur (vérifier les logs)"
+          
           # Vérifier l'état
           echo "✅ Vérification de l'état des services..."
           sudo docker-compose ps
