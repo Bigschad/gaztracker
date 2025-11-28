@@ -108,7 +108,7 @@ const EditGroupePage = () => {
   }
 
   // Use existing logo or preview of new logo
-  const displayLogo = logoPreview || (groupe.logo_url ? `http://localhost:8000${groupe.logo_url}` : null);
+  const displayLogo = logoPreview || (groupe.logo_url ? (groupe.logo_url.startsWith('http') ? groupe.logo_url : `${import.meta.env.VITE_API_URL || ''}${groupe.logo_url}`) : null);
 
   return (
     <div className="w-full">
