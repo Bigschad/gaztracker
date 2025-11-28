@@ -18,7 +18,10 @@ from app.database import Base
 # Import all models to ensure they're registered with Base
 from app.models import (
     User, Palette, Expedition, PaletteMovement,
-    Notification, AuditLog, Partner, Contact
+    Notification, AuditLog, Partner, Contact,
+    Groupe, GrandDistributeur, CentreRemplisseur, Depot,
+    BonEnlevement, LivraisonDetail, CollecteVide,
+    BonReceptionRetour, DetailRetour
 )
 
 # this is the Alembic Config object, which provides
