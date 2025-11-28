@@ -97,9 +97,10 @@ jobs:
             cp $DEPLOY_PATH/.env.docker /tmp/.env.docker.backup
           fi
           
-          if [ -f "$DEPLOY_PATH/docker-compose.yml" ]; then
-            cp $DEPLOY_PATH/docker-compose.yml /tmp/docker-compose.yml.backup
-          fi
+          # Ne PAS sauvegarder docker-compose.yml pour permettre les mises à jour
+          # if [ -f "$DEPLOY_PATH/docker-compose.yml" ]; then
+          #   cp $DEPLOY_PATH/docker-compose.yml /tmp/docker-compose.yml.backup
+          # fi
 
           # Extraire la nouvelle version
           cd $DEPLOY_PATH
@@ -111,9 +112,9 @@ jobs:
             cp /tmp/.env.docker.backup $DEPLOY_PATH/.env.docker
           fi
           
-          if [ -f "/tmp/docker-compose.yml.backup" ]; then
-            cp /tmp/docker-compose.yml.backup $DEPLOY_PATH/docker-compose.yml
-          fi
+          # if [ -f "/tmp/docker-compose.yml.backup" ]; then
+          #   cp /tmp/docker-compose.yml.backup $DEPLOY_PATH/docker-compose.yml
+          # fi
           
           # Nettoyer
           rm /tmp/deploy.tar.gz
@@ -191,6 +192,12 @@ jobs:
           if find alembic/versions -name "*add_missing_tables*.py" 2>/dev/null | grep -q .; then
             echo "   ⚠️  Migration add_missing_tables trouvée, suppression..."
             rm -f alembic/versions/*add_missing_tables*.py
+            echo "   ✅ Migration supprimée"
+          fi
+          
+          if find alembic/versions -name "*fix_enum_types_check*.py" 2>/dev/null | grep -q .; then
+            echo "   ⚠️  Migration fix_enum_types_check trouvée (obsolète), suppression..."
+            rm -f alembic/versions/*fix_enum_types_check*.py
             echo "   ✅ Migration supprimée"
           fi
           

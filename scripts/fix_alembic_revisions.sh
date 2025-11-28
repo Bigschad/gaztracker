@@ -27,6 +27,13 @@ if find alembic/versions -name "*add_missing_tables*.py" 2>/dev/null | grep -q .
     echo "✅ Migration supprimée"
 fi
 
+# Supprimer la migration fix_enum_types_check si elle existe (cause KeyError)
+if find alembic/versions -name "*fix_enum_types_check*.py" 2>/dev/null | grep -q .; then
+    echo "⚠️  Migration fix_enum_types_check trouvée, suppression..."
+    rm -f alembic/versions/*fix_enum_types_check*.py
+    echo "✅ Migration supprimée"
+fi
+
 # Vérifier que la migration add_logo_to_groupe existe
 if [ ! -f "alembic/versions/2025_11_27_add_logo_to_groupe.py" ]; then
     echo "⚠️  Migration add_logo_to_groupe non trouvée!"
