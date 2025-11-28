@@ -14,6 +14,8 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
+        // En développement, proxy vers localhost:8000
+        // En production, nginx gère le proxy
         target: process.env.VITE_API_URL || 'http://localhost:8000',
         changeOrigin: true,
         // Don't rewrite - keep /api prefix as backend expects it
