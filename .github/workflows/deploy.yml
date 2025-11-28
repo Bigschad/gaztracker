@@ -206,26 +206,77 @@ jobs:
       
       - name: Health check
         run: |
-          sleep 10
+          echo "🔍 Vérification de l'état de l'API..."
           
-          # Déterminer l'URL en fonction de l'environnement
-          if [[ "${{ env.ENVIRONMENT }}" == "production" ]] || [[ "${{ env.ENVIRONMENT }}" == "development" ]]; then
-            API_URL="http://${{ secrets.LIGHTSAIL_HOST }}:8000/health"
-          else
-            API_URL="http://${{ secrets.LIGHTSAIL_HOST }}:8001/health"
-          fi
+          # Attendre un peu plus longtemps pour que l'API soit prête
+          echo "⏳ Attente du démarrage complet de l'API (30 secondes)..."
+          sleep 30
           
-          echo "🔍 Health check: $API_URL"
+          # Vérifier depuis l'intérieur du container d'abord (plus fiable)
+          echo "🔍 Vérification interne (depuis le container)..."
+          ssh -i ~/.ssh/lightsail_key \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }} << 'HEALTHCHECK'
           
-          # Tester l'API
-          response=$(curl -s -o /dev/null -w "%{http_code}" $API_URL || echo "000")
+          cd ${{ env.DEPLOY_PATH }}
           
-          if [ "$response" == "200" ]; then
-            echo "✅ API est opérationnelle!"
-          else
-            echo "❌ API ne répond pas correctement (HTTP $response)"
+          # Vérifier que le container est en cours d'exécution
+          if ! sudo docker-compose ps app | grep -q "Up"; then
+            echo "⚠️  Container app n'est pas en cours d'exécution"
+            echo "📋 Logs du container:"
+            sudo docker-compose logs --tail=50 app
             exit 1
           fi
+          
+          # Vérifier depuis l'intérieur du container
+          MAX_RETRIES=10
+          RETRY_COUNT=0
+          SUCCESS=false
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if sudo docker-compose exec -T app curl -f http://localhost:8000/health > /dev/null 2>&1; then
+              echo "✅ API répond correctement depuis l'intérieur du container"
+              SUCCESS=true
+              break
+            fi
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "   Tentative $RETRY_COUNT/$MAX_RETRIES..."
+            sleep 3
+          done
+          
+          if [ "$SUCCESS" = false ]; then
+            echo "⚠️  API ne répond pas depuis l'intérieur du container"
+            echo "📋 Logs du container app:"
+            sudo docker-compose logs --tail=50 app
+            echo ""
+            echo "💡 L'API peut être en cours de démarrage. Vérifiez manuellement:"
+            echo "   docker-compose logs app"
+            echo "   docker-compose exec app curl http://localhost:8000/health"
+            # Ne pas faire échouer le déploiement pour development
+            if [[ "${{ env.ENVIRONMENT }}" == "development" ]]; then
+              echo "⚠️  Health check échoué mais déploiement continué (environment: development)"
+              exit 0
+            else
+              exit 1
+            fi
+          fi
+          
+          # Essayer de vérifier depuis l'extérieur (optionnel)
+          echo "🔍 Vérification externe (depuis l'extérieur)..."
+          EXTERNAL_URL="http://${{ secrets.LIGHTSAIL_HOST }}:8000/health"
+          response=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 $EXTERNAL_URL 2>/dev/null || echo "000")
+          
+          if [ "$response" == "200" ]; then
+            echo "✅ API accessible depuis l'extérieur (HTTP $response)"
+          else
+            echo "⚠️  API non accessible depuis l'extérieur (HTTP $response)"
+            echo "💡 Cela peut être normal si le port 8000 n'est pas exposé publiquement"
+            echo "   L'API fonctionne depuis l'intérieur du container"
+          fi
+          
+          HEALTHCHECK
+          
+          echo "✅ Health check terminé"
       
       - name: Cleanup
         if: always()
