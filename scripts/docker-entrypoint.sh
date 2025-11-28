@@ -52,6 +52,14 @@ wait_for_redis() {
 wait_for_postgres
 wait_for_redis
 
+# Ensure logs directory exists and has correct permissions
+echo "📁 Setting up logs directory..."
+mkdir -p /app/logs
+touch /app/logs/gaztracker.log 2>/dev/null || true
+# Try to fix permissions if we have write access
+chmod 777 /app/logs 2>/dev/null || true
+chmod 666 /app/logs/gaztracker.log 2>/dev/null || true
+
 # Run database migrations
 echo "🔄 Running database migrations..."
 echo "   Checking current database state..."
