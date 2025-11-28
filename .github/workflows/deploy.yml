@@ -84,6 +84,7 @@ jobs:
           # Backup de la configuration actuelle
           if [ -f "$DEPLOY_PATH/.env" ]; then
             cp $DEPLOY_PATH/.env /tmp/.env.backup
+            cp $DEPLOY_PATH/.env.docker /tmp/.env.docker.backup
           fi
           
           if [ -f "$DEPLOY_PATH/docker-compose.yml" ]; then
@@ -97,6 +98,7 @@ jobs:
           # Restaurer la config
           if [ -f "/tmp/.env.backup" ]; then
             cp /tmp/.env.backup $DEPLOY_PATH/.env
+            cp /tmp/.env.docker.backup $DEPLOY_PATH/.env.docker
           fi
           
           if [ -f "/tmp/docker-compose.yml.backup" ]; then
