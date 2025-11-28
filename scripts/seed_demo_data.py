@@ -31,37 +31,63 @@ def clear_data(db: Session):
     """Supprime toutes les données existantes (sauf admin)"""
     print("🗑️  Nettoyage des données existantes...")
     
+    # Fonction helper pour supprimer seulement si la table existe
+    def safe_delete(model_class, table_name=None):
+        try:
+            db.query(model_class).delete()
+            return True
+        except Exception as e:
+            if "does not exist" in str(e) or "UndefinedTable" in str(e):
+                print(f"   ⚠️  Table {table_name or model_class.__tablename__} n'existe pas encore, ignorée")
+                return False
+            else:
+                raise
+    
     # Supprimer dans l'ordre inverse des dépendances
-    db.query(Notification).delete()
-    db.query(DetailRetour).delete()
-    db.query(BonReceptionRetour).delete()
-    db.query(LivraisonDetail).delete()
-    db.query(CollecteVide).delete()
-    db.query(BonEnlevement).delete()
-    db.query(PaletteMovement).delete()
-    db.query(Palette).filter(Palette.rfid_tag_id.isnot(None)).update({Palette.rfid_tag_id: None})
-    db.query(Palette).delete()
+    safe_delete(Notification, "notifications")
+    safe_delete(DetailRetour, "details_retour")
+    safe_delete(BonReceptionRetour, "bons_reception_retour")
+    safe_delete(LivraisonDetail, "livraisons_details")
+    safe_delete(CollecteVide, "collectes_vides")
+    safe_delete(BonEnlevement, "bons_enlevement")
+    safe_delete(PaletteMovement, "palette_movements")
+    
+    # Pour Palette, vérifier si la table existe avant de modifier
+    try:
+        db.query(Palette).filter(Palette.rfid_tag_id.isnot(None)).update({Palette.rfid_tag_id: None})
+        db.query(Palette).delete()
+    except Exception as e:
+        if "does not exist" in str(e) or "UndefinedTable" in str(e):
+            print("   ⚠️  Table palettes n'existe pas encore, ignorée")
+        else:
+            raise
     
     # Contacts
-    db.query(Contact).delete()
+    safe_delete(Contact, "contacts")
     
     # Dépôts
-    db.query(Depot).delete()
+    safe_delete(Depot, "depots")
     
     # Centres Remplisseurs
-    db.query(CentreRemplisseur).delete()
+    safe_delete(CentreRemplisseur, "centres_remplisseurs")
     
     # Partenaires
-    db.query(Partner).delete()
+    safe_delete(Partner, "partners")
     
     # Grands Distributeurs
-    db.query(GrandDistributeur).delete()
+    safe_delete(GrandDistributeur, "grand_distributeurs")
     
     # Groupes
-    db.query(Groupe).delete()
+    safe_delete(Groupe, "groupes")
     
     # Utilisateurs (sauf admin)
-    db.query(User).filter(User.email != 'admin@gaztracker.com').delete()
+    try:
+        db.query(User).filter(User.email != 'admin@gaztracker.com').delete()
+    except Exception as e:
+        if "does not exist" in str(e) or "UndefinedTable" in str(e):
+            print("   ⚠️  Table users n'existe pas encore, ignorée")
+        else:
+            raise
     
     db.commit()
     print("✅ Données nettoyées")
