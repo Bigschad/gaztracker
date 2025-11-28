@@ -37,6 +37,8 @@ def clear_data(db: Session):
             db.query(model_class).delete()
             return True
         except Exception as e:
+            # Rollback en cas d'erreur pour permettre de continuer
+            db.rollback()
             if "does not exist" in str(e) or "UndefinedTable" in str(e):
                 print(f"   ⚠️  Table {table_name or model_class.__tablename__} n'existe pas encore, ignorée")
                 return False
@@ -57,6 +59,7 @@ def clear_data(db: Session):
         db.query(Palette).filter(Palette.rfid_tag_id.isnot(None)).update({Palette.rfid_tag_id: None})
         db.query(Palette).delete()
     except Exception as e:
+        db.rollback()  # Rollback en cas d'erreur
         if "does not exist" in str(e) or "UndefinedTable" in str(e):
             print("   ⚠️  Table palettes n'existe pas encore, ignorée")
         else:
@@ -84,6 +87,7 @@ def clear_data(db: Session):
     try:
         db.query(User).filter(User.email != 'admin@gaztracker.com').delete()
     except Exception as e:
+        db.rollback()  # Rollback en cas d'erreur
         if "does not exist" in str(e) or "UndefinedTable" in str(e):
             print("   ⚠️  Table users n'existe pas encore, ignorée")
         else:
