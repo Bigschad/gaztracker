@@ -47,8 +47,8 @@ services:
       - gaztracker_network
     depends_on:
       - app
-    environment:
-      - VITE_API_URL=http://localhost:8000
+    # VITE_API_URL laissé vide pour utiliser des URLs relatives via nginx proxy
+    # En production, nginx proxy les requêtes /api vers le backend
 
   # =============================================================================
   # PostgreSQL Database

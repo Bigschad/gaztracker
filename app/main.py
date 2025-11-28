@@ -87,6 +87,21 @@ if settings.is_development:
         "http://127.0.0.1:8080",
         "http://127.0.0.1:8082",
     ]
+else:
+    # En production, ajouter l'IP du serveur si elle n'est pas déjà dans ALLOWED_ORIGINS
+    # Cela permet d'accéder depuis l'IP publique du serveur
+    import os
+    server_ip = os.getenv('SERVER_IP') or os.getenv('LIGHTSAIL_HOST')
+    if server_ip:
+        server_origins = [
+            f"http://{server_ip}",
+            f"http://{server_ip}:3000",
+            f"http://{server_ip}:80",
+        ]
+        # Ajouter les origines du serveur si elles ne sont pas déjà présentes
+        for origin in server_origins:
+            if origin not in cors_origins:
+                cors_origins.append(origin)
 
 app.add_middleware(
     CORSMiddleware,

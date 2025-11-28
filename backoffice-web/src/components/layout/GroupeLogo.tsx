@@ -23,7 +23,7 @@ export const GroupeLogo = () => {
         <div className="flex items-center justify-center w-20 h-20 rounded-lg bg-primary/10 overflow-hidden">
           {groupe.logo_url ? (
             <img
-              src={`http://localhost:8000${groupe.logo_url}`}
+              src={groupe.logo_url?.startsWith('http') ? groupe.logo_url : `${import.meta.env.VITE_API_URL || ''}${groupe.logo_url}`}
               alt={groupe.name}
               className="w-full h-full object-contain p-2"
               onError={(e) => {

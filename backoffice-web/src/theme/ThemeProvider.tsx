@@ -111,7 +111,8 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 
   const applyLogoTheme = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/v1/theme/extract-from-logo', {
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${apiUrl}/api/v1/theme/extract-from-logo`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
