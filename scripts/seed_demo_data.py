@@ -31,19 +31,30 @@ def clear_data(db: Session):
     """Supprime toutes les données existantes (sauf admin)"""
     print("🗑️  Nettoyage des données existantes...")
     
+    # Fonction helper pour vérifier si une table existe
+    def table_exists(table_name: str) -> bool:
+        """Vérifie si une table existe dans la base de données"""
+        try:
+            result = db.execute(
+                db.text(f"SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '{table_name}')")
+            )
+            return result.scalar()
+        except Exception:
+            return False
+    
     # Fonction helper pour supprimer seulement si la table existe
     def safe_delete(model_class, table_name=None):
+        table = table_name or model_class.__tablename__
+        if not table_exists(table):
+            print(f"   ⚠️  Table {table} n'existe pas encore, ignorée")
+            return False
         try:
             db.query(model_class).delete()
             return True
         except Exception as e:
-            # Rollback en cas d'erreur pour permettre de continuer
             db.rollback()
-            if "does not exist" in str(e) or "UndefinedTable" in str(e):
-                print(f"   ⚠️  Table {table_name or model_class.__tablename__} n'existe pas encore, ignorée")
-                return False
-            else:
-                raise
+            print(f"   ⚠️  Erreur lors de la suppression de {table}: {e}")
+            return False
     
     # Supprimer dans l'ordre inverse des dépendances
     safe_delete(Notification, "notifications")
@@ -55,15 +66,15 @@ def clear_data(db: Session):
     safe_delete(PaletteMovement, "palette_movements")
     
     # Pour Palette, vérifier si la table existe avant de modifier
-    try:
-        db.query(Palette).filter(Palette.rfid_tag_id.isnot(None)).update({Palette.rfid_tag_id: None})
-        db.query(Palette).delete()
-    except Exception as e:
-        db.rollback()  # Rollback en cas d'erreur
-        if "does not exist" in str(e) or "UndefinedTable" in str(e):
-            print("   ⚠️  Table palettes n'existe pas encore, ignorée")
-        else:
-            raise
+    if table_exists("palettes"):
+        try:
+            db.query(Palette).filter(Palette.rfid_tag_id.isnot(None)).update({Palette.rfid_tag_id: None})
+            db.query(Palette).delete()
+        except Exception as e:
+            db.rollback()
+            print(f"   ⚠️  Erreur lors de la suppression de palettes: {e}")
+    else:
+        print("   ⚠️  Table palettes n'existe pas encore, ignorée")
     
     # Contacts
     safe_delete(Contact, "contacts")
@@ -84,14 +95,14 @@ def clear_data(db: Session):
     safe_delete(Groupe, "groupes")
     
     # Utilisateurs (sauf admin)
-    try:
-        db.query(User).filter(User.email != 'admin@gaztracker.com').delete()
-    except Exception as e:
-        db.rollback()  # Rollback en cas d'erreur
-        if "does not exist" in str(e) or "UndefinedTable" in str(e):
-            print("   ⚠️  Table users n'existe pas encore, ignorée")
-        else:
-            raise
+    if table_exists("users"):
+        try:
+            db.query(User).filter(User.email != 'admin@gaztracker.com').delete()
+        except Exception as e:
+            db.rollback()
+            print(f"   ⚠️  Erreur lors de la suppression de users: {e}")
+    else:
+        print("   ⚠️  Table users n'existe pas encore, ignorée")
     
     db.commit()
     print("✅ Données nettoyées")
