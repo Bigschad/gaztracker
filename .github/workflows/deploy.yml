@@ -46,49 +46,11 @@ jobs:
         run: |
           # Utiliser git archive pour créer une archive propre
           # git archive respecte automatiquement .gitignore
-          # Pour les exclusions supplémentaires, on utilise tar avec --exclude-from
           echo "📦 Création de l'archive de déploiement..."
           
-          # Créer un fichier temporaire avec les exclusions
-          cat > /tmp/exclude_patterns << 'EOF'
-          node_modules/
-          backoffice-web/node_modules/
-          backoffice-web/dist/
-          backoffice-web/.vite/
-          *.pyc
-          __pycache__/
-          .env.local
-          .env.docker
-          *.log
-          .pytest_cache/
-          .coverage/
-          htmlcov/
-          .DS_Store
-          Thumbs.db
-          *.tmp
-          *.swp
-          *.swo
-          key/
-          uploads/
-          logs/
-          .git/
-          EOF
-          
-          # Créer l'archive avec git archive (sans exclusions - elles sont gérées par .gitignore)
-          # Puis utiliser tar pour créer l'archive finale avec exclusions
-          git archive --format=tar HEAD | \
-            tar --exclude-from=/tmp/exclude_patterns \
-                --exclude='.git' \
-                -czf deploy.tar.gz -
-          
-          # Alternative: utiliser directement tar si git archive pose problème
-          # tar -czf deploy.tar.gz \
-          #   --exclude-from=/tmp/exclude_patterns \
-          #   --exclude='.git' \
-          #   .
-          
-          # Nettoyer le fichier temporaire
-          rm -f /tmp/exclude_patterns
+          # Créer l'archive directement avec git archive
+          # git archive respecte déjà .gitignore, donc node_modules, etc. sont exclus
+          git archive --format=tar.gz --output=deploy.tar.gz HEAD
           
           # Vérifier que l'archive a été créée
           if [ ! -f deploy.tar.gz ]; then
@@ -99,6 +61,10 @@ jobs:
           # Afficher la taille de l'archive
           echo "✅ Archive créée:"
           ls -lh deploy.tar.gz
+          
+          # Afficher un résumé des fichiers inclus (optionnel, pour debug)
+          echo "📋 Contenu de l'archive (premiers fichiers):"
+          tar -tzf deploy.tar.gz | head -20 || true
       
       - name: Upload to server
         run: |
