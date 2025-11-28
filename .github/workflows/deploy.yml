@@ -24,7 +24,10 @@ jobs:
         
       - name: Set environment based on branch or tag
         run: |
-          if [[ "${{ github.ref }}" == "refs/tags/devfast" ]] || [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          if [[ "${{ github.ref }}" == "refs/tags/devfast" ]]; then
+            echo "ENVIRONMENT=development" >> $GITHUB_ENV
+            echo "DEPLOY_PATH=/opt/gaztracker" >> $GITHUB_ENV
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "ENVIRONMENT=production" >> $GITHUB_ENV
             echo "DEPLOY_PATH=/opt/gaztracker" >> $GITHUB_ENV
           else
@@ -143,7 +146,7 @@ jobs:
           sleep 10
           
           # Déterminer l'URL en fonction de l'environnement
-          if [[ "${{ env.ENVIRONMENT }}" == "production" ]]; then
+          if [[ "${{ env.ENVIRONMENT }}" == "production" ]] || [[ "${{ env.ENVIRONMENT }}" == "development" ]]; then
             API_URL="http://${{ secrets.LIGHTSAIL_HOST }}:8000/health"
           else
             API_URL="http://${{ secrets.LIGHTSAIL_HOST }}:8001/health"
