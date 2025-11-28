@@ -101,7 +101,10 @@ QUICKSTART.md
 DOCKER_SETUP.md
 
 .claude/
-alembic/
+# alembic/ - DO NOT IGNORE (env.py and versions/ must be versioned)
+# Only ignore compiled Python files in alembic
+alembic/versions/*.pyc
+alembic/__pycache__/
 
 # Mobile App (Flutter)
 mobile-app/**/build/
