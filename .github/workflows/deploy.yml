@@ -148,12 +148,24 @@ jobs:
             fi
           done
           
-          # Gérer les migrations problématiques (add_missing_tables)
-          echo "🔧 Vérification des migrations problématiques..."
-          if sudo docker-compose exec -T app test -f scripts/remove_problematic_migration.sh; then
-            echo "   Script de correction disponible"
-            # Ne pas exécuter automatiquement, juste informer
-            echo "   💡 Si erreur 'type already exists', exécuter: bash scripts/remove_problematic_migration.sh"
+          # Nettoyer les migrations problématiques avant d'appliquer
+          echo "🔧 Nettoyage des migrations problématiques..."
+          if find alembic/versions -name "*add_missing_tables*.py" 2>/dev/null | grep -q .; then
+            echo "   ⚠️  Migration add_missing_tables trouvée, suppression..."
+            rm -f alembic/versions/*add_missing_tables*.py
+            echo "   ✅ Migration supprimée"
+          fi
+          
+          # Vérifier la chaîne de révisions
+          echo "🔍 Vérification de la chaîne de révisions..."
+          if sudo docker-compose exec -T app alembic check 2>&1 | grep -q "KeyError\|down_revision"; then
+            echo "   ⚠️  Problème détecté, tentative de correction..."
+            # Obtenir la dernière révision valide depuis l'historique
+            LAST_VALID=$(sudo docker-compose exec -T app alembic history 2>/dev/null | grep -E "^\s+[a-f0-9]+|^\s+[a-z_]+" | tail -1 | awk '{print $1}' | tr -d '()' || echo "")
+            if [ -n "$LAST_VALID" ] && [ "$LAST_VALID" != "head" ]; then
+              echo "   📌 Marquage de la révision: $LAST_VALID"
+              sudo docker-compose exec -T app alembic stamp "$LAST_VALID" || true
+            fi
           fi
           
           # Exécuter les migrations Alembic
@@ -166,10 +178,15 @@ jobs:
           else
             echo "⚠️  Erreur lors des migrations"
             echo "📋 Logs des migrations:"
-            sudo docker-compose logs app | grep -i "alembic\|migration" | tail -20 || true
-            echo "💡 Si erreur 'type already exists', exécuter sur le serveur:"
-            echo "   bash scripts/remove_problematic_migration.sh"
-            echo "   docker-compose exec app alembic upgrade heads"
+            sudo docker-compose logs app | grep -i "alembic\|migration\|KeyError" | tail -30 || true
+            echo ""
+            echo "💡 Solutions possibles:"
+            echo "   1. Supprimer les migrations problématiques:"
+            echo "      rm alembic/versions/*add_missing_tables*.py"
+            echo "   2. Vérifier la chaîne de révisions:"
+            echo "      docker-compose exec app alembic history"
+            echo "   3. Marquer manuellement une révision valide:"
+            echo "      docker-compose exec app alembic stamp <revision>"
             # Ne pas faire échouer le déploiement pour une erreur de migration
             # L'utilisateur peut corriger manuellement
           fi
