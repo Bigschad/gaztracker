@@ -45,31 +45,50 @@ jobs:
       - name: Create deployment package
         run: |
           # Utiliser git archive pour créer une archive propre
-          # Cela évite les problèmes de fichiers qui changent pendant la lecture
-          # et respecte automatiquement .gitignore
-          git archive --format=tar.gz \
-            --output=deploy.tar.gz \
-            HEAD \
-            --exclude='node_modules/' \
-            --exclude='backoffice-web/node_modules/' \
-            --exclude='backoffice-web/dist/' \
-            --exclude='backoffice-web/.vite/' \
-            --exclude='*.pyc' \
-            --exclude='__pycache__/' \
-            --exclude='.env.local' \
-            --exclude='.env.docker' \
-            --exclude='*.log' \
-            --exclude='.pytest_cache/' \
-            --exclude='.coverage/' \
-            --exclude='htmlcov/' \
-            --exclude='.DS_Store' \
-            --exclude='Thumbs.db' \
-            --exclude='*.tmp' \
-            --exclude='*.swp' \
-            --exclude='*.swo' \
-            --exclude='key/' \
-            --exclude='uploads/' \
-            --exclude='logs/'
+          # git archive respecte automatiquement .gitignore
+          # Pour les exclusions supplémentaires, on utilise tar avec --exclude-from
+          echo "📦 Création de l'archive de déploiement..."
+          
+          # Créer un fichier temporaire avec les exclusions
+          cat > /tmp/exclude_patterns << 'EOF'
+          node_modules/
+          backoffice-web/node_modules/
+          backoffice-web/dist/
+          backoffice-web/.vite/
+          *.pyc
+          __pycache__/
+          .env.local
+          .env.docker
+          *.log
+          .pytest_cache/
+          .coverage/
+          htmlcov/
+          .DS_Store
+          Thumbs.db
+          *.tmp
+          *.swp
+          *.swo
+          key/
+          uploads/
+          logs/
+          .git/
+          EOF
+          
+          # Créer l'archive avec git archive (sans exclusions - elles sont gérées par .gitignore)
+          # Puis utiliser tar pour créer l'archive finale avec exclusions
+          git archive --format=tar HEAD | \
+            tar --exclude-from=/tmp/exclude_patterns \
+                --exclude='.git' \
+                -czf deploy.tar.gz -
+          
+          # Alternative: utiliser directement tar si git archive pose problème
+          # tar -czf deploy.tar.gz \
+          #   --exclude-from=/tmp/exclude_patterns \
+          #   --exclude='.git' \
+          #   .
+          
+          # Nettoyer le fichier temporaire
+          rm -f /tmp/exclude_patterns
           
           # Vérifier que l'archive a été créée
           if [ ! -f deploy.tar.gz ]; then
@@ -78,7 +97,7 @@ jobs:
           fi
           
           # Afficher la taille de l'archive
-          echo "📦 Archive créée:"
+          echo "✅ Archive créée:"
           ls -lh deploy.tar.gz
       
       - name: Upload to server
