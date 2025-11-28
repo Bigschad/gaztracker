@@ -46,9 +46,30 @@ jobs:
         run: |
           # Utiliser git archive pour créer une archive propre
           # Cela évite les problèmes de fichiers qui changent pendant la lecture
+          # et respecte automatiquement .gitignore
           git archive --format=tar.gz \
             --output=deploy.tar.gz \
-            HEAD
+            HEAD \
+            --exclude='node_modules/' \
+            --exclude='backoffice-web/node_modules/' \
+            --exclude='backoffice-web/dist/' \
+            --exclude='backoffice-web/.vite/' \
+            --exclude='*.pyc' \
+            --exclude='__pycache__/' \
+            --exclude='.env.local' \
+            --exclude='.env.docker' \
+            --exclude='*.log' \
+            --exclude='.pytest_cache/' \
+            --exclude='.coverage/' \
+            --exclude='htmlcov/' \
+            --exclude='.DS_Store' \
+            --exclude='Thumbs.db' \
+            --exclude='*.tmp' \
+            --exclude='*.swp' \
+            --exclude='*.swo' \
+            --exclude='key/' \
+            --exclude='uploads/' \
+            --exclude='logs/'
           
           # Vérifier que l'archive a été créée
           if [ ! -f deploy.tar.gz ]; then
@@ -57,6 +78,7 @@ jobs:
           fi
           
           # Afficher la taille de l'archive
+          echo "📦 Archive créée:"
           ls -lh deploy.tar.gz
       
       - name: Upload to server
@@ -126,9 +148,46 @@ jobs:
           echo "⏳ Attente du démarrage des services..."
           sleep 15
           
+          # Vérifier si la base de données est prête
+          echo "🔍 Vérification de la connexion à la base de données..."
+          for i in {1..30}; do
+            if sudo docker-compose exec -T app python -c "from app.database import db_manager; db_manager.init_db(); print('OK')" 2>/dev/null; then
+              echo "✅ Base de données accessible"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "⚠️  Base de données non accessible après 30 tentatives"
+            else
+              echo "   Tentative $i/30..."
+              sleep 2
+            fi
+          done
+          
+          # Gérer les migrations problématiques (add_missing_tables)
+          echo "🔧 Vérification des migrations problématiques..."
+          if sudo docker-compose exec -T app test -f scripts/remove_problematic_migration.sh; then
+            echo "   Script de correction disponible"
+            # Ne pas exécuter automatiquement, juste informer
+            echo "   💡 Si erreur 'type already exists', exécuter: bash scripts/remove_problematic_migration.sh"
+          fi
+          
           # Exécuter les migrations Alembic
           echo "🔄 Exécution des migrations Alembic..."
-          sudo docker-compose exec -T app alembic upgrade heads || echo "⚠️  Migrations déjà à jour ou erreur (vérifier les logs)"
+          if sudo docker-compose exec -T app alembic upgrade heads; then
+            echo "✅ Migrations appliquées avec succès!"
+            # Afficher l'état actuel
+            echo "📊 État actuel des migrations:"
+            sudo docker-compose exec -T app alembic current || true
+          else
+            echo "⚠️  Erreur lors des migrations"
+            echo "📋 Logs des migrations:"
+            sudo docker-compose logs app | grep -i "alembic\|migration" | tail -20 || true
+            echo "💡 Si erreur 'type already exists', exécuter sur le serveur:"
+            echo "   bash scripts/remove_problematic_migration.sh"
+            echo "   docker-compose exec app alembic upgrade heads"
+            # Ne pas faire échouer le déploiement pour une erreur de migration
+            # L'utilisateur peut corriger manuellement
+          fi
           
           # Vérifier l'état
           echo "✅ Vérification de l'état des services..."
@@ -178,8 +237,15 @@ jobs:
         if: success()
         run: |
           echo "✅ Déploiement réussi sur ${{ env.ENVIRONMENT }}"
-          echo "🔗 Backend: http://${{ secrets.LIGHTSAIL_HOST }}:8000"
+          echo "🔗 Backend API: http://${{ secrets.LIGHTSAIL_HOST }}:8000"
           echo "🔗 Frontend: http://${{ secrets.LIGHTSAIL_HOST }}"
+          echo "📚 Documentation API: http://${{ secrets.LIGHTSAIL_HOST }}:8000/docs"
+          echo ""
+          echo "💡 En cas d'erreur de migration 'type already exists':"
+          echo "   ssh ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }}"
+          echo "   cd ${{ env.DEPLOY_PATH }}"
+          echo "   bash scripts/remove_problematic_migration.sh"
+          echo "   docker-compose exec app alembic upgrade heads"
       
       - name: Notification on failure
         if: failure()
