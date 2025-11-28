@@ -42,14 +42,30 @@ jobs:
       - name: Create deployment package
         run: |
           # Créer une archive sans node_modules
+          # Utiliser --warning=no-file-changed pour ignorer les changements pendant la lecture
           tar -czf deploy.tar.gz \
+            --warning=no-file-changed \
             --exclude='node_modules' \
             --exclude='.git' \
             --exclude='backoffice-web/node_modules' \
             --exclude='backoffice-web/dist' \
+            --exclude='backoffice-web/.vite' \
             --exclude='*.pyc' \
             --exclude='__pycache__' \
             --exclude='.env.local' \
+            --exclude='.env.docker' \
+            --exclude='*.log' \
+            --exclude='.pytest_cache' \
+            --exclude='.coverage' \
+            --exclude='htmlcov' \
+            --exclude='.DS_Store' \
+            --exclude='Thumbs.db' \
+            --exclude='*.tmp' \
+            --exclude='*.swp' \
+            --exclude='*.swo' \
+            --exclude='key/' \
+            --exclude='uploads/' \
+            --exclude='logs/' \
             .
       
       - name: Upload to server
