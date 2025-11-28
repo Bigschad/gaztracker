@@ -15,7 +15,9 @@ RUN npm install --legacy-peer-deps
 COPY . .
 
 # Build argument for API URL
-ARG VITE_API_URL=http://localhost:8000
+# En production, laisser vide pour utiliser des URLs relatives via nginx proxy
+# En développement, définir VITE_API_URL=http://localhost:8000
+ARG VITE_API_URL=
 ENV VITE_API_URL=${VITE_API_URL}
 
 # Build the application
