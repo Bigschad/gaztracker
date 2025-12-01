@@ -24,7 +24,7 @@ class CentreRemplisseur(Base, TimestampMixin):
         id: Unique centre remplisseur identifier (UUID)
         name: Centre name
         code: Unique code
-        grand_distributeur_id: FK to grand_distributeurs
+        partner_id: FK to partners (distributeur)
         address: Address
         city: City
         postal_code: Postal code
@@ -73,12 +73,12 @@ class CentreRemplisseur(Base, TimestampMixin):
     )
     
     # Foreign Keys
-    grand_distributeur_id = Column(
+    partner_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("grand_distributeurs.id", ondelete="CASCADE"),
+        ForeignKey("partners.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="FK to grand_distributeurs"
+        comment="FK to partners (distributeur)"
     )
     
     # Address Information
@@ -183,9 +183,9 @@ class CentreRemplisseur(Base, TimestampMixin):
     )
     
     # Relationships
-    grand_distributeur = relationship(
-        "GrandDistributeur",
-        back_populates="centres_remplisseurs"
+    partner = relationship(
+        "Partner",
+        foreign_keys=[partner_id]
     )
     
     bons_enlevement = relationship(
@@ -212,7 +212,7 @@ class CentreRemplisseur(Base, TimestampMixin):
     # Indexes
     __table_args__ = (
         Index("ix_centres_name_active", "name", "is_active"),
-        Index("ix_centres_grand_dist", "grand_distributeur_id", "is_active"),
+        Index("ix_centres_partner", "partner_id", "is_active"),
         Index("ix_centres_location", "latitude", "longitude"),
     )
     

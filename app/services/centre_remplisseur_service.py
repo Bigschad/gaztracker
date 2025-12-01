@@ -8,15 +8,67 @@ from typing import Optional, List
 from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
+from datetime import datetime
+import secrets
+import string
 
 from app.models.centre_remplisseur import CentreRemplisseur
-from app.models.grand_distributeur import GrandDistributeur
+from app.models.partner import Partner, PartnerType
 from app.schemas.centre_remplisseur import CentreRemplisseurCreate, CentreRemplisseurUpdate
 from app.core.exceptions import NotFoundException, DuplicateException
 
 
 class CentreRemplisseurService:
     """Service for CentreRemplisseur operations."""
+    
+    @staticmethod
+    def _generate_code(db: Session) -> str:
+        """
+        Generate a unique code for a new CentreRemplisseur.
+        
+        Format: CR-YYYY-NNNNN where:
+        - CR: Prefix for Centre Remplisseur
+        - YYYY: Current year
+        - NNNNN: Sequential number (5 digits, zero-padded)
+        
+        Args:
+            db: Database session
+            
+        Returns:
+            Generated code (e.g., "CR-2025-00001")
+        """
+        current_year = datetime.now().year
+        prefix = f"CR-{current_year}-"
+        
+        # Find the latest code for the current year
+        latest_centre = db.execute(
+            select(CentreRemplisseur).where(
+                CentreRemplisseur.code.like(f"{prefix}%")
+            ).order_by(CentreRemplisseur.code.desc())
+        ).scalar_one_or_none()
+        
+        if latest_centre and latest_centre.code:
+            # Extract the counter from the last code
+            import re
+            match = re.search(r'CR-\d{4}-(\d{5})', latest_centre.code)
+            if match:
+                counter = int(match.group(1)) + 1
+            else:
+                counter = 1
+        else:
+            counter = 1
+        
+        # Generate the new code with zero-padding
+        code = f"{prefix}{counter:05d}"
+        
+        # Ensure uniqueness (in case of race condition)
+        while db.execute(
+            select(CentreRemplisseur).where(CentreRemplisseur.code == code)
+        ).scalar_one_or_none():
+            counter += 1
+            code = f"{prefix}{counter:05d}"
+        
+        return code
     
     @staticmethod
     def create(db: Session, schema: CentreRemplisseurCreate) -> CentreRemplisseur:
@@ -31,24 +83,32 @@ class CentreRemplisseurService:
             Created CentreRemplisseur
             
         Raises:
-            NotFoundException: If GrandDistributeur not found
+            NotFoundException: If Partner not found or not a distributeur
             DuplicateException: If code or email already exists
         """
-        # Check if GrandDistributeur exists
-        grand_distributeur = db.execute(
-            select(GrandDistributeur).where(GrandDistributeur.id == schema.grand_distributeur_id)
+        # Check if Partner exists and is a GROSSISTE (distributeur)
+        partner = db.execute(
+            select(Partner).where(Partner.id == schema.partner_id)
         ).scalar_one_or_none()
         
-        if not grand_distributeur:
-            raise NotFoundException(f"GrandDistributeur with ID {schema.grand_distributeur_id} not found")
+        if not partner:
+            raise NotFoundException(f"Partner with ID {schema.partner_id} not found")
         
-        # Check for duplicate code
-        existing = db.execute(
-            select(CentreRemplisseur).where(CentreRemplisseur.code == schema.code)
-        ).scalar_one_or_none()
+        if partner.type != PartnerType.GROSSISTE:
+            raise NotFoundException(f"Partner with ID {schema.partner_id} is not a distributeur (GROSSISTE)")
         
-        if existing:
-            raise DuplicateException(f"CentreRemplisseur with code '{schema.code}' already exists")
+        # Generate code if not provided
+        code = schema.code
+        if not code:
+            code = CentreRemplisseurService._generate_code(db)
+        else:
+            # Check for duplicate code if provided
+            existing = db.execute(
+                select(CentreRemplisseur).where(CentreRemplisseur.code == code)
+            ).scalar_one_or_none()
+            
+            if existing:
+                raise DuplicateException(f"CentreRemplisseur with code '{code}' already exists")
         
         # Check for duplicate email if provided
         if schema.email:
@@ -60,7 +120,9 @@ class CentreRemplisseurService:
                 raise DuplicateException(f"CentreRemplisseur with email '{schema.email}' already exists")
         
         # Create new CentreRemplisseur
-        centre = CentreRemplisseur(**schema.model_dump())
+        centre_data = schema.model_dump()
+        centre_data['code'] = code
+        centre = CentreRemplisseur(**centre_data)
         db.add(centre)
         db.commit()
         db.refresh(centre)
@@ -112,7 +174,7 @@ class CentreRemplisseurService:
         db: Session,
         skip: int = 0,
         limit: int = 100,
-        grand_distributeur_id: Optional[UUID] = None,
+        partner_id: Optional[UUID] = None,
         is_active: Optional[bool] = None,
         city: Optional[str] = None,
         search: Optional[str] = None
@@ -124,7 +186,7 @@ class CentreRemplisseurService:
             db: Database session
             skip: Number of records to skip
             limit: Maximum number of records to return
-            grand_distributeur_id: Filter by GrandDistributeur ID
+            partner_id: Filter by Partner ID
             is_active: Filter by active status
             city: Filter by city
             search: Search by name or code
@@ -135,8 +197,8 @@ class CentreRemplisseurService:
         query = select(CentreRemplisseur)
         
         # Apply filters
-        if grand_distributeur_id:
-            query = query.where(CentreRemplisseur.grand_distributeur_id == grand_distributeur_id)
+        if partner_id:
+            query = query.where(CentreRemplisseur.partner_id == partner_id)
         
         if is_active is not None:
             query = query.where(CentreRemplisseur.is_active == is_active)
@@ -160,7 +222,7 @@ class CentreRemplisseurService:
     @staticmethod
     def count(
         db: Session,
-        grand_distributeur_id: Optional[UUID] = None,
+        partner_id: Optional[UUID] = None,
         is_active: Optional[bool] = None
     ) -> int:
         """
@@ -168,7 +230,7 @@ class CentreRemplisseurService:
         
         Args:
             db: Database session
-            grand_distributeur_id: Filter by GrandDistributeur ID
+            partner_id: Filter by Partner ID
             is_active: Filter by active status
             
         Returns:
@@ -176,8 +238,8 @@ class CentreRemplisseurService:
         """
         query = select(func.count(CentreRemplisseur.id))
         
-        if grand_distributeur_id:
-            query = query.where(CentreRemplisseur.grand_distributeur_id == grand_distributeur_id)
+        if partner_id:
+            query = query.where(CentreRemplisseur.partner_id == partner_id)
         
         if is_active is not None:
             query = query.where(CentreRemplisseur.is_active == is_active)
@@ -202,19 +264,22 @@ class CentreRemplisseurService:
             Updated CentreRemplisseur
             
         Raises:
-            NotFoundException: If CentreRemplisseur or GrandDistributeur not found
+            NotFoundException: If CentreRemplisseur or Partner not found
             DuplicateException: If code or email already exists for another CentreRemplisseur
         """
         centre = CentreRemplisseurService.get_by_id(db, centre_id)
         
-        # Check if GrandDistributeur exists if being updated
-        if schema.grand_distributeur_id:
-            grand_distributeur = db.execute(
-                select(GrandDistributeur).where(GrandDistributeur.id == schema.grand_distributeur_id)
+        # Check if Partner exists and is a GROSSISTE if being updated
+        if schema.partner_id:
+            partner = db.execute(
+                select(Partner).where(Partner.id == schema.partner_id)
             ).scalar_one_or_none()
             
-            if not grand_distributeur:
-                raise NotFoundException(f"GrandDistributeur with ID {schema.grand_distributeur_id} not found")
+            if not partner:
+                raise NotFoundException(f"Partner with ID {schema.partner_id} not found")
+            
+            if partner.type != PartnerType.GROSSISTE:
+                raise NotFoundException(f"Partner with ID {schema.partner_id} is not a distributeur (GROSSISTE)")
         
         # Check for duplicate code if being updated
         if schema.code and schema.code != centre.code:
@@ -324,28 +389,30 @@ class CentreRemplisseurService:
         Raises:
             NotFoundException: If CentreRemplisseur not found
         """
+        from app.models.bon_enlevement import BonEnlevement
+        from app.models.bon_reception_retour import BonReceptionRetour
+        
         centre = CentreRemplisseurService.get_by_id(db, centre_id)
         
         # Count bons d'enlèvement
         bons_enlevement_count = db.execute(
-            select(func.count()).select_from(CentreRemplisseur).join(
-                CentreRemplisseur.bons_enlevement
-            ).where(CentreRemplisseur.id == centre_id)
+            select(func.count(BonEnlevement.id)).where(
+                BonEnlevement.centre_remplisseur_id == centre_id
+            )
         ).scalar() or 0
         
         # Count bons de réception retour
         bons_retour_count = db.execute(
-            select(func.count()).select_from(CentreRemplisseur).join(
-                CentreRemplisseur.bons_reception_retour
-            ).where(CentreRemplisseur.id == centre_id)
+            select(func.count(BonReceptionRetour.id)).where(
+                BonReceptionRetour.centre_remplisseur_id == centre_id
+            )
         ).scalar() or 0
         
         return {
             "centre_remplisseur": centre,
             "bons_enlevement_count": bons_enlevement_count,
             "bons_retour_count": bons_retour_count,
-            "grand_distributeur_name": centre.grand_distributeur.name if centre.grand_distributeur else None,
-            "groupe_name": centre.grand_distributeur.groupe.name if centre.grand_distributeur and centre.grand_distributeur.groupe else None,
+            "partner_name": centre.partner.name if centre.partner else None,
         }
     
     @staticmethod

@@ -11,7 +11,7 @@ import {
 interface CentreRemplisseurListParams {
   skip?: number;
   limit?: number;
-  grand_distributeur_id?: string;
+  partner_id?: string;
   is_active?: boolean;
   city?: string;
   search?: string;

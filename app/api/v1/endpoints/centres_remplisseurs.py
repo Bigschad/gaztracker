@@ -33,8 +33,8 @@ def create_centre(
     Create a new Centre Remplisseur.
     
     - **name**: Name of the filling center
-    - **code**: Unique code
-    - **grand_distributeur_id**: ID of the parent grand distributeur
+    - **code**: Unique code (auto-generated if not provided)
+    - **partner_id**: ID of the partner (distributeur/GROSSISTE)
     - **address**, **city**, **postal_code**: Location details
     - **latitude**, **longitude**: GPS coordinates (optional)
     - **contact_name**, **contact_phone**: Contact person
@@ -52,7 +52,7 @@ def create_centre(
 def list_centres(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    grand_distributeur_id: Optional[UUID] = None,
+    partner_id: Optional[UUID] = None,
     is_active: Optional[bool] = None,
     city: Optional[str] = None,
     search: Optional[str] = None,
@@ -61,7 +61,7 @@ def list_centres(
     """
     List all Centres Remplisseurs with optional filtering.
     
-    - **grand_distributeur_id**: Filter by grand distributeur
+    - **partner_id**: Filter by partner (distributeur)
     - **is_active**: Filter by active status
     - **city**: Filter by city
     - **search**: Search by name or code
@@ -70,7 +70,7 @@ def list_centres(
         db, 
         skip=skip, 
         limit=limit, 
-        grand_distributeur_id=grand_distributeur_id,
+        partner_id=partner_id,
         is_active=is_active,
         city=city,
         search=search
@@ -111,7 +111,7 @@ def get_centre(
                 "id": centre.id,
                 "name": centre.name,
                 "code": centre.code,
-                "grand_distributeur_id": centre.grand_distributeur_id,
+                "partner_id": centre.partner_id,
                 "address": centre.address,
                 "city": centre.city,
                 "postal_code": centre.postal_code,
@@ -126,8 +126,7 @@ def get_centre(
                 "notes": centre.notes,
                 "created_at": centre.created_at,
                 "updated_at": centre.updated_at,
-                "grand_distributeur_name": stats["grand_distributeur_name"],
-                "groupe_name": stats["groupe_name"],
+                "partner_name": stats["partner_name"],
                 "bons_enlevement_count": stats["bons_enlevement_count"],
                 "bons_retour_count": stats["bons_retour_count"]
             }

@@ -56,16 +56,10 @@ const CentreRemplisseurDetailsPage = () => {
               <p className="text-sm text-muted-foreground">Nom</p>
               <p className="font-semibold">{centre.name}</p>
             </div>
-            {centre.grand_distributeur_name && (
+            {centre.partner_name && (
               <div>
-                <p className="text-sm text-muted-foreground">Grand Distributeur</p>
-                <p className="font-semibold">{centre.grand_distributeur_name}</p>
-              </div>
-            )}
-            {centre.groupe_name && (
-              <div>
-                <p className="text-sm text-muted-foreground">Groupe</p>
-                <p className="font-semibold">{centre.groupe_name}</p>
+                <p className="text-sm text-muted-foreground">Distributeur</p>
+                <p className="font-semibold">{centre.partner_name}</p>
               </div>
             )}
             {centre.address && (

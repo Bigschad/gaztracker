@@ -16,8 +16,8 @@ class CentreRemplisseurBase(BaseModel):
     """Base CentreRemplisseur schema with common attributes."""
     
     name: str = Field(..., min_length=1, max_length=255, description="Name of the filling center")
-    code: str = Field(..., min_length=1, max_length=50, description="Unique code for the filling center")
-    grand_distributeur_id: UUID = Field(..., description="Foreign key to the GrandDistributeur model")
+    code: Optional[str] = Field(None, min_length=1, max_length=50, description="Unique code for the filling center (auto-generated if not provided)")
+    partner_id: UUID = Field(..., description="Foreign key to the Partner model (distributeur)")
     address: Optional[str] = Field(None, max_length=500, description="Physical address of the filling center")
     city: Optional[str] = Field(None, max_length=100, description="City where the filling center is located")
     postal_code: Optional[str] = Field(None, max_length=20, description="Postal code of the filling center")
@@ -55,7 +55,7 @@ class CentreRemplisseurUpdate(BaseModel):
     
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     code: Optional[str] = Field(None, min_length=1, max_length=50)
-    grand_distributeur_id: Optional[UUID] = None
+    partner_id: Optional[UUID] = None
     address: Optional[str] = Field(None, max_length=500)
     city: Optional[str] = Field(None, max_length=100)
     postal_code: Optional[str] = Field(None, max_length=20)
@@ -89,7 +89,7 @@ class CentreRemplisseurList(BaseModel):
     id: UUID
     name: str
     code: str
-    grand_distributeur_id: UUID
+    partner_id: UUID
     city: Optional[str]
     is_active: bool
     
@@ -101,8 +101,7 @@ class CentreRemplisseurList(BaseModel):
 class CentreRemplisseurDetail(CentreRemplisseurRead):
     """Schema for detailed CentreRemplisseur with related data."""
     
-    grand_distributeur_name: Optional[str] = Field(None, description="Name of the parent grand distributeur")
-    groupe_name: Optional[str] = Field(None, description="Name of the parent groupe")
+    partner_name: Optional[str] = Field(None, description="Name of the partner (distributeur)")
     bons_enlevement_count: Optional[int] = Field(None, description="Number of bons d'enlèvement")
     bons_retour_count: Optional[int] = Field(None, description="Number of bons de réception retour")
     

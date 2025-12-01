@@ -1,7 +1,7 @@
 import { useNavigate, Link } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
-import { centreRemplisseurService } from '../../services/api';
+import { centreRemplisseurService, partnerService } from '../../services/api';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from '../../components/common';
 import { ArrowLeft } from 'lucide-react';
 import { CentreRemplisseurCreate } from '../../types';
@@ -9,8 +9,17 @@ import { CentreRemplisseurCreate } from '../../types';
 const CreateCentreRemplisseurPage = () => {
   const navigate = useNavigate();
 
-  // For now, we'll create a simple form that requires grand_distributeur_id
-  // In a real scenario, you'd have a separate endpoint for grand distributeurs
+  // Fetch partners of type GROSSISTE (Distributeur)
+  const { data: partnersData } = useQuery({
+    queryKey: ['partners', 'GROSSISTE'],
+    queryFn: () => partnerService.list({
+      page: 1,
+      page_size: 100,
+      type: 'GROSSISTE',
+      is_active: true,
+    }),
+  });
+
   const { register, handleSubmit, formState: { errors }, control } = useForm<CentreRemplisseurCreate>({
     defaultValues: {
       is_active: true,
@@ -49,15 +58,6 @@ const CreateCentreRemplisseurPage = () => {
           <CardContent>
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium mb-1">Code *</label>
-                <Input
-                  error={errors.code?.message}
-                  {...register('code', { required: 'Le code est requis' })}
-                  placeholder="Code unique du centre"
-                />
-              </div>
-
-              <div>
                 <label className="block text-sm font-medium mb-1">Nom *</label>
                 <Input
                   error={errors.name?.message}
@@ -67,31 +67,44 @@ const CreateCentreRemplisseurPage = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Grand Distributeur ID *</label>
+                <label className="block text-sm font-medium mb-1">Distributeur *</label>
                 <Controller
-                  name="grand_distributeur_id"
+                  name="partner_id"
                   control={control}
-                  rules={{ required: 'Le grand distributeur est requis' }}
+                  rules={{ required: 'Le distributeur est requis' }}
                   render={({ field }) => (
-                    <Input
+                    <select
                       {...field}
-                      placeholder="UUID du grand distributeur"
-                      error={errors.grand_distributeur_id?.message}
-                    />
+                      className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      error={errors.partner_id?.message}
+                    >
+                      <option value="">Sélectionner un distributeur</option>
+                      {partnersData?.items.map((partner) => (
+                        <option key={partner.id} value={partner.id}>
+                          {partner.name} {partner.code ? `(${partner.code})` : ''}
+                        </option>
+                      ))}
+                    </select>
                   )}
                 />
+                {errors.partner_id && (
+                  <p className="mt-1 text-xs text-red-600">{errors.partner_id.message}</p>
+                )}
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Entrez l'UUID du grand distributeur. Un endpoint pour lister les grands distributeurs sera ajouté prochainement.
+                  Le code sera généré automatiquement.
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Adresse</label>
+                <label className="block text-sm font-medium mb-1">Adresse complète (Google Maps / OpenStreetMap)</label>
                 <Input
                   error={errors.address?.message}
                   {...register('address')}
-                  placeholder="Adresse"
+                  placeholder="Ex: 123 Rue Example, Abidjan, Côte d'Ivoire"
                 />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Saisissez l'adresse complète. Les coordonnées GPS seront récupérées automatiquement depuis l'adresse.
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -161,38 +174,6 @@ const CreateCentreRemplisseurPage = () => {
                     error={errors.contact_phone?.message}
                     {...register('contact_phone')}
                     placeholder="Téléphone du contact"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Latitude</label>
-                  <Input
-                    type="number"
-                    step="any"
-                    error={errors.latitude?.message}
-                    {...register('latitude', {
-                      valueAsNumber: true,
-                      min: { value: -90, message: 'Latitude doit être entre -90 et 90' },
-                      max: { value: 90, message: 'Latitude doit être entre -90 et 90' },
-                    })}
-                    placeholder="Latitude GPS"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Longitude</label>
-                  <Input
-                    type="number"
-                    step="any"
-                    error={errors.longitude?.message}
-                    {...register('longitude', {
-                      valueAsNumber: true,
-                      min: { value: -180, message: 'Longitude doit être entre -180 et 180' },
-                      max: { value: 180, message: 'Longitude doit être entre -180 et 180' },
-                    })}
-                    placeholder="Longitude GPS"
                   />
                 </div>
               </div>

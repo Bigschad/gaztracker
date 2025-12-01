@@ -4,7 +4,7 @@ export interface CentreRemplisseur {
   id: string; // UUID
   name: string;
   code: string;
-  grand_distributeur_id: string; // UUID
+  partner_id: string; // UUID
   address?: string | null;
   city?: string | null;
   postal_code?: string | null;
@@ -25,22 +25,21 @@ export interface CentreRemplisseurList {
   id: string;
   name: string;
   code: string;
-  grand_distributeur_id: string;
+  partner_id: string;
   city?: string | null;
   is_active: boolean;
 }
 
 export interface CentreRemplisseurDetail extends CentreRemplisseur {
-  grand_distributeur_name?: string | null;
-  groupe_name?: string | null;
+  partner_name?: string | null;
   bons_enlevement_count?: number | null;
   bons_retour_count?: number | null;
 }
 
 export interface CentreRemplisseurCreate {
   name: string;
-  code: string;
-  grand_distributeur_id: string;
+  code?: string; // Auto-generated if not provided
+  partner_id: string;
   address?: string;
   city?: string;
   postal_code?: string;
@@ -58,7 +57,7 @@ export interface CentreRemplisseurCreate {
 export interface CentreRemplisseurUpdate {
   name?: string;
   code?: string;
-  grand_distributeur_id?: string;
+  partner_id?: string;
   address?: string;
   city?: string;
   postal_code?: string;
