@@ -24,13 +24,14 @@ def upgrade():
     palette_condition_enum.create(op.get_bind(), checkfirst=True)
     
     # Add the column with default value
+    # Use sa.text() with explicit cast for enum default value (PostgreSQL requirement)
     op.add_column(
         'palettes',
         sa.Column(
             'condition',
             palette_condition_enum,
             nullable=True,
-            server_default="'NEUVE'",
+            server_default=sa.text("'NEUVE'::palette_condition"),
             comment='Condition de la palette (NEUVE ou RECONDITIONNEE)'
         )
     )
