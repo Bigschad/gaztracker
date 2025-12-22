@@ -23,6 +23,16 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema: Change grand_distributeur_id to partner_id."""
+    # First, clean up orphaned records: find centres_remplisseurs with grand_distributeur_id
+    # that don't exist in partners table
+    # We'll delete these orphaned records to avoid foreign key violations
+    op.execute("""
+        DELETE FROM centres_remplisseurs
+        WHERE grand_distributeur_id NOT IN (
+            SELECT id FROM partners
+        )
+    """)
+    
     # Drop the existing index
     op.drop_index('ix_centres_grand_dist', table_name='centres_remplisseurs')
     
