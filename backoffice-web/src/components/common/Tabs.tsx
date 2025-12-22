@@ -21,7 +21,12 @@ export const Tabs = ({ tabs, activeTab, onTabChange }: TabsProps) => {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => onTabChange(tab.id)}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onTabChange(tab.id);
+              }}
               className={`
                 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
                 ${

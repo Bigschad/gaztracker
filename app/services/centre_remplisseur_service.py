@@ -41,11 +41,12 @@ class CentreRemplisseurService:
         prefix = f"CR-{current_year}-"
         
         # Find the latest code for the current year
-        latest_centre = db.execute(
+        result = db.execute(
             select(CentreRemplisseur).where(
                 CentreRemplisseur.code.like(f"{prefix}%")
-            ).order_by(CentreRemplisseur.code.desc())
-        ).scalar_one_or_none()
+            ).order_by(CentreRemplisseur.code.desc()).limit(1)
+        )
+        latest_centre = result.scalars().first()
         
         if latest_centre and latest_centre.code:
             # Extract the counter from the last code
@@ -86,16 +87,16 @@ class CentreRemplisseurService:
             NotFoundException: If Partner not found or not a distributeur
             DuplicateException: If code or email already exists
         """
-        # Check if Partner exists and is a GROSSISTE (distributeur)
+        # Check if Partner exists and is a DISTRIBUTEUR
         partner = db.execute(
             select(Partner).where(Partner.id == schema.partner_id)
         ).scalar_one_or_none()
         
         if not partner:
-            raise NotFoundException(f"Partner with ID {schema.partner_id} not found")
+            raise NotFoundException("Partner", schema.partner_id)
         
-        if partner.type != PartnerType.GROSSISTE:
-            raise NotFoundException(f"Partner with ID {schema.partner_id} is not a distributeur (GROSSISTE)")
+        if partner.type != PartnerType.DISTRIBUTEUR:
+            raise NotFoundException("Partner", schema.partner_id, f"Partner must be of type DISTRIBUTEUR, but is {partner.type.value}")
         
         # Generate code if not provided
         code = schema.code
@@ -108,7 +109,7 @@ class CentreRemplisseurService:
             ).scalar_one_or_none()
             
             if existing:
-                raise DuplicateException(f"CentreRemplisseur with code '{code}' already exists")
+                raise DuplicateException("CentreRemplisseur", "code", code)
         
         # Check for duplicate email if provided
         if schema.email:
@@ -117,7 +118,7 @@ class CentreRemplisseurService:
             ).scalar_one_or_none()
             
             if existing_email:
-                raise DuplicateException(f"CentreRemplisseur with email '{schema.email}' already exists")
+                raise DuplicateException("CentreRemplisseur", "email", schema.email)
         
         # Create new CentreRemplisseur
         centre_data = schema.model_dump()
@@ -149,7 +150,7 @@ class CentreRemplisseurService:
         ).scalar_one_or_none()
         
         if not centre:
-            raise NotFoundException(f"CentreRemplisseur with ID {centre_id} not found")
+            raise NotFoundException("CentreRemplisseur", centre_id)
         
         return centre
     
@@ -269,17 +270,17 @@ class CentreRemplisseurService:
         """
         centre = CentreRemplisseurService.get_by_id(db, centre_id)
         
-        # Check if Partner exists and is a GROSSISTE if being updated
+        # Check if Partner exists and is a DISTRIBUTEUR if being updated
         if schema.partner_id:
             partner = db.execute(
                 select(Partner).where(Partner.id == schema.partner_id)
             ).scalar_one_or_none()
             
             if not partner:
-                raise NotFoundException(f"Partner with ID {schema.partner_id} not found")
+                raise NotFoundException("Partner", schema.partner_id)
             
-            if partner.type != PartnerType.GROSSISTE:
-                raise NotFoundException(f"Partner with ID {schema.partner_id} is not a distributeur (GROSSISTE)")
+            if partner.type != PartnerType.DISTRIBUTEUR:
+                raise NotFoundException("Partner", schema.partner_id, f"Partner must be of type DISTRIBUTEUR, but is {partner.type.value}")
         
         # Check for duplicate code if being updated
         if schema.code and schema.code != centre.code:
@@ -291,7 +292,7 @@ class CentreRemplisseurService:
             ).scalar_one_or_none()
             
             if existing:
-                raise DuplicateException(f"CentreRemplisseur with code '{schema.code}' already exists")
+                raise DuplicateException("CentreRemplisseur", "code", schema.code)
         
         # Check for duplicate email if being updated
         if schema.email and schema.email != centre.email:
@@ -303,7 +304,7 @@ class CentreRemplisseurService:
             ).scalar_one_or_none()
             
             if existing_email:
-                raise DuplicateException(f"CentreRemplisseur with email '{schema.email}' already exists")
+                raise DuplicateException("CentreRemplisseur", "email", schema.email)
         
         # Update attributes
         update_data = schema.model_dump(exclude_unset=True)
@@ -414,43 +415,4 @@ class CentreRemplisseurService:
             "bons_retour_count": bons_retour_count,
             "partner_name": centre.partner.name if centre.partner else None,
         }
-    
-    @staticmethod
-    def get_by_location(
-        db: Session,
-        latitude: float,
-        longitude: float,
-        radius_km: float = 10.0
-    ) -> List[CentreRemplisseur]:
-        """
-        Get CentreRemplisseurs near a location.
-        
-        Args:
-            db: Database session
-            latitude: Search latitude
-            longitude: Search longitude
-            radius_km: Search radius in kilometers
-            
-        Returns:
-            List of nearby CentreRemplisseurs
-            
-        Note:
-            This is a simple bounding box search. For production, consider PostGIS.
-        """
-        # Simple bounding box (approximate)
-        # 1 degree latitude ≈ 111 km
-        # 1 degree longitude ≈ 111 km * cos(latitude)
-        import math
-        
-        lat_delta = radius_km / 111.0
-        lon_delta = radius_km / (111.0 * math.cos(math.radians(latitude)))
-        
-        query = select(CentreRemplisseur).where(
-            (CentreRemplisseur.latitude.between(latitude - lat_delta, latitude + lat_delta)) &
-            (CentreRemplisseur.longitude.between(longitude - lon_delta, longitude + lon_delta)) &
-            (CentreRemplisseur.is_active == True)
-        )
-        
-        result = db.execute(query)
-        return list(result.scalars().all())
 

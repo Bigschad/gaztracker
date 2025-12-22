@@ -14,7 +14,7 @@ import logging
 
 from app.models.user import User, UserRole
 from app.models.audit import AuditLog
-from app.schemas.user import UserCreate, UserUpdate, PasswordChange
+from app.schemas.user import UserCreate, UserUpdate, PasswordChange, PasswordReset
 from app.utils.security import hash_password, verify_password
 from app.utils.exceptions import (
     ResourceNotFoundException,
@@ -386,6 +386,51 @@ class UserService:
         )
 
         logger.info(f"Password changed for user {user.id}")
+
+    async def reset_password(
+        self,
+        user_id: uuid.UUID,
+        password_data: PasswordReset,
+        reset_by_id: Optional[uuid.UUID] = None,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None
+    ) -> None:
+        """
+        Reset user password (admin only, no current password required).
+
+        Args:
+            user_id: User ID
+            password_data: Password reset data
+            reset_by_id: ID of admin performing the reset
+            ip_address: Client IP address (for audit)
+            user_agent: Client user agent (for audit)
+
+        Raises:
+            ResourceNotFoundException: If user not found
+        """
+        # Get existing user
+        user = await self.get_user_by_id(user_id)
+        if not user:
+            raise ResourceNotFoundException(resource_type="User", resource_id=user_id)
+
+        # Update password
+        user.password_hash = hash_password(password_data.new_password)
+
+        await self.db.commit()
+        await self.db.refresh(user)
+
+        # Log password reset
+        await self._log_user_action(
+            user_id=reset_by_id,
+            action="PASSWORD_RESET",
+            resource_id=str(user.id),
+            ip_address=ip_address,
+            user_agent=user_agent,
+            success=True,
+            additional_data={"target_user_email": user.email}
+        )
+
+        logger.info(f"Password reset for user {user.id} by admin {reset_by_id}")
 
     async def _log_user_action(
         self,

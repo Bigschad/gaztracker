@@ -199,6 +199,19 @@ export interface PaginatedResponse<T> {
   totalPages: number;
 }
 
+// Vehicle Types
+export interface Vehicle {
+  id: string;
+  immatriculation: string;
+  type?: string;
+  brand?: string;
+  model?: string;
+  driverId?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Error Types
 export interface ApiError {
   message: string;

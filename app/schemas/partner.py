@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from uuid import UUID
 
 from app.models.partner import PartnerType
+from app.schemas.groupe import GroupeRead
 
 
 # =============================================================================
@@ -21,6 +22,7 @@ class PartnerBase(BaseModel):
     
     name: str = Field(..., max_length=255, description="Partner name (company name)")
     type: PartnerType = Field(..., description="Partner type")
+    groupe_id: Optional[UUID] = Field(None, description="FK to groupe (for DISTRIBUTEUR only)")
     address: Optional[str] = Field(None, max_length=500, description="Street address")
     city: Optional[str] = Field(None, max_length=100, description="City")
     postal_code: Optional[str] = Field(None, max_length=20, description="Postal code")
@@ -61,6 +63,7 @@ class PartnerUpdate(BaseModel):
     
     name: Optional[str] = Field(None, max_length=255, description="Partner name")
     type: Optional[PartnerType] = Field(None, description="Partner type")
+    groupe_id: Optional[UUID] = Field(None, description="FK to groupe (for DISTRIBUTEUR only)")
     address: Optional[str] = Field(None, max_length=500, description="Street address")
     city: Optional[str] = Field(None, max_length=100, description="City")
     postal_code: Optional[str] = Field(None, max_length=20, description="Postal code")
@@ -79,6 +82,7 @@ class PartnerResponse(PartnerBase):
     """Schema for partner response."""
     
     id: UUID = Field(..., description="Partner ID")
+    groupe: Optional[GroupeRead] = Field(None, description="Groupe details (for DISTRIBUTEUR only)")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     

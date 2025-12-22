@@ -1,6 +1,7 @@
 // Palette types matching backend schemas
 
 import { RFIDTag } from './rfidTag';
+import { CentreRemplisseur } from './centreRemplisseur';
 
 export enum PaletteType {
   B6 = 'B6',
@@ -10,12 +11,19 @@ export enum PaletteType {
 
 export enum PaletteStatus {
   CREATION = 'CREATION',
-  EN_STOCK = 'EN_STOCK',
-  EN_ROUTE = 'EN_ROUTE',
-  EN_RECEPTION = 'EN_RECEPTION',
-  LIVREE = 'LIVREE',
-  RETOURNEE = 'RETOURNEE',
+  AU_CENTRE = 'AU_CENTRE',
+  EN_CHARGEMENT = 'EN_CHARGEMENT',
+  EN_ROUTE_LIVRAISON = 'EN_ROUTE_LIVRAISON',
+  AU_DEPOT = 'AU_DEPOT',
+  EN_ROUTE_RETOUR = 'EN_ROUTE_RETOUR',
+  EN_CONTROLE = 'EN_CONTROLE',
+  VALIDEE = 'VALIDEE',
   OUT = 'OUT',
+}
+
+export enum PaletteCondition {
+  NEUVE = 'NEUVE',
+  RECONDITIONNEE = 'RECONDITIONNEE',
 }
 
 export interface Palette {
@@ -25,10 +33,15 @@ export interface Palette {
   rfid_tag_id?: string | null; // UUID
   rfid_tag?: RFIDTag | null; // Tag RFID complet
   type: PaletteType;
+  condition?: PaletteCondition | null; // Condition de la palette (NEUVE ou RECONDITIONNEE)
   capacity?: number | null; // Capacité en nombre de bouteilles possibles
   manufacturing_date?: string | null; // Date de fabrication
   status: PaletteStatus;
+  is_full?: boolean | null; // Whether the palette is full
   current_partner_id?: string | null; // UUID du partenaire (grossiste) actuel
+  current_centre_remplisseur_id?: string | null; // UUID du centre remplisseur actuel
+  current_centre_remplisseur?: CentreRemplisseur | null; // Centre remplisseur complet
+  bon_enlevement_actuel_id?: string | null; // UUID du bon d'enlèvement actuel
   location_latitude?: number | null;
   location_longitude?: number | null;
   location_address?: string | null;
@@ -41,6 +54,7 @@ export interface Palette {
 
 export interface PaletteCreate {
   type: PaletteType;
+  condition?: PaletteCondition; // Condition de la palette (NEUVE ou RECONDITIONNEE)
   reference_code?: string; // Code de référence personnalisé
   capacity?: number; // Capacité en nombre de bouteilles possibles
   manufacturing_date?: string; // Date de fabrication (format ISO date)
@@ -54,6 +68,7 @@ export interface PaletteCreate {
 
 export interface PaletteUpdate {
   type?: PaletteType;
+  condition?: PaletteCondition; // Condition de la palette (NEUVE ou RECONDITIONNEE)
   status?: PaletteStatus;
   rfid_tag_id?: string; // Permet de réassigner un tag RFID
   location_latitude?: number;

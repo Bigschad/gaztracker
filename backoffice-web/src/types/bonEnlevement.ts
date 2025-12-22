@@ -27,6 +27,7 @@ export interface BonEnlevement {
   date_chargement?: string | null;
   date_depart?: string | null;
   date_arrivee_finale?: string | null;
+  date_heure_livraison?: string | null;
   validateur_centre_id?: string | null; // UUID
   recepteur_final_id?: string | null; // UUID
   observations?: string | null;
@@ -65,6 +66,8 @@ export interface BonEnlevementCreate {
   chauffeur_nom?: string;
   chauffeur_societe?: string;
   chauffeur_phone?: string;
+  date_heure_livraison?: string; // ISO datetime string
+  palette_ids?: string[]; // Optional list of palette IDs to assign during creation
   observations?: string;
   instructions_livraison?: string;
 }
@@ -75,6 +78,7 @@ export interface BonEnlevementUpdate {
   chauffeur_nom?: string;
   chauffeur_societe?: string;
   chauffeur_phone?: string;
+  date_heure_livraison?: string; // ISO datetime string
   observations?: string;
   instructions_livraison?: string;
 }

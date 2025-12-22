@@ -122,7 +122,7 @@ class Settings(BaseSettings):
     # CORS Configuration
     # =============================================================================
     ALLOWED_ORIGINS: Union[str, List[str]] = Field(
-        default=["http://localhost:3000", "http://localhost:8080", "http://localhost:8082"],
+        default=["http://localhost:3000", "http://localhost:8080", "http://localhost:8082", "http://15.237.112.22", "http://15.237.112.22:3000", "http://15.237.112.22:3001", "http://15.237.112.22:8080", "http://15.237.112.22:8082"],
         description="Allowed CORS origins"
     )
     ALLOW_CREDENTIALS: bool = Field(default=True, description="Allow credentials in CORS")
@@ -248,12 +248,17 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         """Check if running in production environment."""
-        return self.APP_ENVIRONMENT.lower() == "production"
+        return self.APP_ENVIRONMENT.lower() in ["production", "prod"]
+
+    @property
+    def is_staging(self) -> bool:
+        """Check if running in staging/recette environment."""
+        return self.APP_ENVIRONMENT.lower() in ["staging", "recette", "preprod"]
 
     @property
     def is_development(self) -> bool:
         """Check if running in development environment."""
-        return self.APP_ENVIRONMENT.lower() == "development"
+        return self.APP_ENVIRONMENT.lower() in ["development", "dev", "local"]
 
     @property
     def is_testing(self) -> bool:

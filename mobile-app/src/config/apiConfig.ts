@@ -88,5 +88,13 @@ export const API_ENDPOINTS = {
     MARK_READ: (id: string) => `/notifications/${id}/read`,
     MARK_ALL_READ: '/notifications/read-all',
   },
+  // Vehicles
+  VEHICLES: {
+    LIST: '/vehicles',
+    CREATE: '/vehicles',
+    GET_BY_ID: (id: string) => `/vehicles/${id}`,
+    UPDATE: (id: string) => `/vehicles/${id}`,
+    DELETE: (id: string) => `/vehicles/${id}`,
+  },
 };
 

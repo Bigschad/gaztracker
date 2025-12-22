@@ -83,7 +83,7 @@ const LoginPage = () => {
         </form>
 
         <div className="mt-6 text-center text-sm text-muted-foreground">
-          <p>Compte de test: admin / admin123</p>
+          <p>Copyright © 2025 IDC. Tous droits réservés.</p>
         </div>
       </Card>
     </div>

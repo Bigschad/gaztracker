@@ -1,8 +1,8 @@
 import { useNavigate, Link } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { partnerService } from '../../services/api';
+import { partnerService, groupeService } from '../../services/api';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select } from '../../components/common';
 import { ArrowLeft } from 'lucide-react';
 import { partnerCreateSchema, PartnerCreateFormData } from '../../utils/validators';
@@ -11,25 +11,42 @@ import { PartnerType } from '../../types';
 const CreatePartnerPage = () => {
   const navigate = useNavigate();
 
-  const { register, handleSubmit, control, formState: { errors } } = useForm<PartnerCreateFormData>({
+  const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<PartnerCreateFormData>({
     resolver: zodResolver(partnerCreateSchema),
     defaultValues: {
       country: 'France',
       is_active: true,
+      type: undefined,
+      groupe_id: undefined,
     },
+  });
+
+  // Watch the type field to show/hide groupe selection
+  const selectedType = watch('type');
+
+  // Fetch active groupes for DISTRIBUTEUR type
+  const { data: groupes, isLoading: isLoadingGroupes } = useQuery({
+    queryKey: ['groupes', 'active'],
+    queryFn: () => groupeService.list({ limit: 100, is_active: true }),
+    enabled: selectedType === PartnerType.DISTRIBUTEUR,
   });
 
   const createMutation = useMutation({
     mutationFn: (data: PartnerCreateFormData) => {
       // Ensure type is properly cast to PartnerType
-      const payload = {
+      const payload: any = {
         ...data,
         type: data.type as PartnerType,
       };
-      return partnerService.create(payload as any);
+      // Include groupe_id only if it's provided and not empty
+      if (data.groupe_id && data.groupe_id.trim() !== '') {
+        payload.groupe_id = data.groupe_id;
+      }
+      return partnerService.create(payload);
     },
     onSuccess: (data) => {
       navigate(`/partners/${data.id}`);
+      window.location.reload();
     },
   });
 
@@ -76,12 +93,16 @@ const CreatePartnerPage = () => {
                       options={[
                         { value: '', label: 'Sélectionner un type' },
                         { value: PartnerType.GROSSISTE, label: 'Grossiste' },
-                        { value: PartnerType.FOURNISSEUR, label: 'Fournisseur' },
+                        { value: PartnerType.DISTRIBUTEUR, label: 'Distributeur' },
                         { value: PartnerType.TRANSPORTEUR, label: 'Transporteur' },
                         { value: PartnerType.AUTRE, label: 'Autre' },
                       ]}
                       onChange={(e) => {
                         field.onChange(e.target.value as PartnerType);
+                        // Reset groupe_id when type changes
+                        if (e.target.value !== PartnerType.DISTRIBUTEUR) {
+                          setValue('groupe_id', undefined);
+                        }
                       }}
                     />
                   )}
@@ -90,6 +111,49 @@ const CreatePartnerPage = () => {
                   <p className="mt-1 text-sm text-destructive">{errors.type.message}</p>
                 )}
               </div>
+
+              {selectedType === PartnerType.DISTRIBUTEUR && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Groupe *</label>
+                  <Controller
+                    name="groupe_id"
+                    control={control}
+                    rules={{ required: 'Le groupe est requis pour les distributeurs' }}
+                    render={({ field }) => (
+                      <>
+                        <Select
+                          value={field.value || ''}
+                          options={[
+                            { value: '', label: isLoadingGroupes ? 'Chargement...' : 'Sélectionner un groupe' },
+                            ...(groupes?.map((groupe) => ({
+                              value: groupe.id,
+                              label: groupe.name,
+                            })) || []),
+                          ]}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            field.onChange(value && value.trim() !== '' ? value : undefined);
+                          }}
+                          disabled={isLoadingGroupes}
+                        />
+                        {isLoadingGroupes && (
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            Chargement des groupes...
+                          </p>
+                        )}
+                        {!isLoadingGroupes && (!groupes || groupes.length === 0) && (
+                          <p className="mt-1 text-sm text-amber-600">
+                            Aucun groupe actif disponible. Veuillez créer un groupe d'abord.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  />
+                  {errors.groupe_id && (
+                    <p className="mt-1 text-sm text-destructive">{errors.groupe_id.message}</p>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium mb-1">Adresse</label>

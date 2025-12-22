@@ -8,6 +8,7 @@ from typing import Optional, List
 from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
+from datetime import datetime
 
 from app.models.depot import Depot
 from app.models.partner import Partner
@@ -17,6 +18,60 @@ from app.core.exceptions import NotFoundException, DuplicateException, Validatio
 
 class DepotService:
     """Service for Depot operations."""
+    
+    @staticmethod
+    def _generate_code(db: Session) -> str:
+        """
+        Generate a unique code for a new Depot.
+        
+        Format: DEP-YYYY-NNNNN where:
+        - DEP: Prefix for Depot
+        - YYYY: Current year
+        - NNNNN: Sequential number (5 digits, zero-padded)
+        
+        Args:
+            db: Database session
+            
+        Returns:
+            Generated code (e.g., "DEP-2025-00001")
+        """
+        current_year = datetime.now().year
+        prefix = f"DEP-{current_year}-"
+        
+        # Find the latest code for the current year
+        result = db.execute(
+            select(Depot).where(
+                Depot.code.like(f"{prefix}%")
+            ).order_by(Depot.code.desc()).limit(1)
+        )
+        latest_depot = result.scalars().first()
+        
+        if latest_depot and latest_depot.code:
+            # Extract the counter from the last code
+            import re
+            match = re.search(r'DEP-\d{4}-(\d{5})', latest_depot.code)
+            if match:
+                counter = int(match.group(1)) + 1
+            else:
+                counter = 1
+        else:
+            counter = 1
+        
+        # Generate the new code with zero-padding
+        code = f"{prefix}{counter:05d}"
+        
+        # Ensure uniqueness (in case of race condition)
+        result_check = db.execute(
+            select(Depot).where(Depot.code == code)
+        )
+        while result_check.scalars().first():
+            counter += 1
+            code = f"{prefix}{counter:05d}"
+            result_check = db.execute(
+                select(Depot).where(Depot.code == code)
+            )
+        
+        return code
     
     @staticmethod
     def create(db: Session, schema: DepotCreate) -> Depot:
@@ -41,16 +96,10 @@ class DepotService:
         ).scalar_one_or_none()
         
         if not partner:
-            raise NotFoundException(f"Partner with ID {schema.partner_id} not found")
+            raise NotFoundException("Partner", schema.partner_id)
         
-        # Check for duplicate code if provided
-        if schema.code:
-            existing = db.execute(
-                select(Depot).where(Depot.code == schema.code)
-            ).scalar_one_or_none()
-            
-            if existing:
-                raise DuplicateException(f"Depot with code '{schema.code}' already exists")
+        # Generate code automatically
+        code = DepotService._generate_code(db)
         
         # If this is set as main depot, unset any existing main depot for this partner
         if schema.is_main_depot:
@@ -65,7 +114,9 @@ class DepotService:
                 existing_main.is_main_depot = False
         
         # Create new Depot
-        depot = Depot(**schema.model_dump())
+        depot_data = schema.model_dump()
+        depot_data['code'] = code
+        depot = Depot(**depot_data)
         db.add(depot)
         db.commit()
         db.refresh(depot)
@@ -92,7 +143,7 @@ class DepotService:
         ).scalar_one_or_none()
         
         if not depot:
-            raise NotFoundException(f"Depot with ID {depot_id} not found")
+            raise NotFoundException("Depot", depot_id)
         
         return depot
     
@@ -224,7 +275,7 @@ class DepotService:
             ).scalar_one_or_none()
             
             if not partner:
-                raise NotFoundException(f"Partner with ID {schema.partner_id} not found")
+                raise NotFoundException("Partner", schema.partner_id)
         
         # Check for duplicate code if being updated
         if schema.code and schema.code != depot.code:
@@ -236,7 +287,7 @@ class DepotService:
             ).scalar_one_or_none()
             
             if existing:
-                raise DuplicateException(f"Depot with code '{schema.code}' already exists")
+                raise DuplicateException("Depot", "code", schema.code)
         
         # If setting as main depot, unset any existing main depot for this partner
         if schema.is_main_depot and not depot.is_main_depot:
@@ -419,49 +470,5 @@ class DepotService:
             "partner_type": partner.type.value if partner else None,
             "palettes_count": palettes_count,
             "livraisons_count": livraisons_count,
-            "total_capacity": depot.total_capacity,
         }
-    
-    @staticmethod
-    def get_by_location(
-        db: Session,
-        latitude: float,
-        longitude: float,
-        radius_km: float = 10.0,
-        is_active: bool = True
-    ) -> List[Depot]:
-        """
-        Get Depots near a location.
-        
-        Args:
-            db: Database session
-            latitude: Search latitude
-            longitude: Search longitude
-            radius_km: Search radius in kilometers
-            is_active: Filter by active status
-            
-        Returns:
-            List of nearby Depots
-            
-        Note:
-            This is a simple bounding box search. For production, consider PostGIS.
-        """
-        # Simple bounding box (approximate)
-        # 1 degree latitude ≈ 111 km
-        # 1 degree longitude ≈ 111 km * cos(latitude)
-        import math
-        
-        lat_delta = radius_km / 111.0
-        lon_delta = radius_km / (111.0 * math.cos(math.radians(latitude)))
-        
-        query = select(Depot).where(
-            (Depot.latitude.between(latitude - lat_delta, latitude + lat_delta)) &
-            (Depot.longitude.between(longitude - lon_delta, longitude + lon_delta))
-        )
-        
-        if is_active:
-            query = query.where(Depot.is_active == True)
-        
-        result = db.execute(query)
-        return list(result.scalars().all())
 

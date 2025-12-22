@@ -43,6 +43,7 @@ const EditGroupePage = () => {
       queryClient.invalidateQueries({ queryKey: ['groupes-active'] });
       alert('Groupe modifié avec succès');
       navigate(`/groupes/${id}`);
+      window.location.reload();
     },
     onError: (error: any) => {
       alert(error.response?.data?.detail || 'Erreur lors de la modification');
@@ -108,7 +109,8 @@ const EditGroupePage = () => {
   }
 
   // Use existing logo or preview of new logo
-  const displayLogo = logoPreview || (groupe.logo_url ? (groupe.logo_url.startsWith('http') ? groupe.logo_url : `${import.meta.env.VITE_API_URL || ''}${groupe.logo_url}`) : null);
+  // Use relative URLs for uploaded logos (they go through Nginx proxy)
+  const displayLogo = logoPreview || (groupe.logo_url ? (groupe.logo_url.startsWith('http') ? groupe.logo_url : groupe.logo_url) : null);
 
   return (
     <div className="w-full">

@@ -24,7 +24,6 @@ ROLE_HIERARCHY = {
     UserRole.RESPONSABLE_LOGISTIQUE: 80,
     UserRole.OPERATEUR_USINE: 60,
     UserRole.CHAUFFEUR: 40,
-    UserRole.GROSSISTE: 30,
 }
 
 # Password requirements

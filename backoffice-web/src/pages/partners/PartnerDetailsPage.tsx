@@ -24,7 +24,7 @@ const PartnerDetailsPage = () => {
   const getTypeLabel = (type: PartnerType) => {
     const labels: Record<PartnerType, string> = {
       GROSSISTE: 'Grossiste',
-      FOURNISSEUR: 'Fournisseur',
+      DISTRIBUTEUR: 'Distributeur',
       TRANSPORTEUR: 'Transporteur',
       AUTRE: 'Autre',
     };

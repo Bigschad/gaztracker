@@ -275,12 +275,12 @@ async def validate_delivery(
     expedition_id: UUID,
     validate_request: ExpeditionValidateRequest,
     db: Session = Depends(get_sync_db),
-    current_user: User = Depends(require_role(["ADMIN", "GROSSISTE", "RESPONSABLE_LOGISTIQUE"]))
+    current_user: User = Depends(require_role(["ADMIN", "RESPONSABLE_LOGISTIQUE"]))
 ):
     """
     Validate expedition delivery with OTP.
 
-    Required roles: ADMIN, GROSSISTE, RESPONSABLE_LOGISTIQUE
+    Required roles: ADMIN, RESPONSABLE_LOGISTIQUE
 
     This endpoint:
     1. Validates the provided OTP code

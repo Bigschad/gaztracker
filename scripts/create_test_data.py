@@ -39,16 +39,16 @@ def create_test_partners_and_contacts():
                 "notes": "Principal grossiste pour la région parisienne"
             },
             {
-                "name": "Fournisseur Gaz Sud",
-                "type": PartnerType.FOURNISSEUR,
+                "name": "Distributeur Gaz Sud",
+                "type": PartnerType.DISTRIBUTEUR,
                 "address": "456 Avenue des Industries",
                 "city": "Lyon",
                 "postal_code": "69001",
                 "country": "France",
                 "phone": "+33456789123",
-                "email": "info@fournisseur-gaz-sud.fr",
+                "email": "info@distributeur-gaz-sud.fr",
                 "is_active": True,
-                "notes": "Fournisseur principal pour le Sud de la France"
+                "notes": "Distributeur principal pour le Sud de la France"
             },
             {
                 "name": "Transport Express",

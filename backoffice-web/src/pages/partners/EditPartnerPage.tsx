@@ -3,15 +3,18 @@ import { useNavigate, Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { partnerService } from '../../services/api';
+import { partnerService, groupeService } from '../../services/api';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select } from '../../components/common';
 import { ArrowLeft } from 'lucide-react';
 import { partnerUpdateSchema, PartnerUpdateFormData } from '../../utils/validators';
 import { PartnerType } from '../../types';
+import { useAuth } from '../../hooks/useAuth';
+import { UserRole } from '../../types/user';
 
 const EditPartnerPage = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
 
   const { data: partner, isLoading } = useQuery({
     queryKey: ['partner', id],
@@ -19,8 +22,50 @@ const EditPartnerPage = () => {
     enabled: !!id,
   });
 
-  const { register, handleSubmit, control, formState: { errors }, reset } = useForm<PartnerUpdateFormData>({
+  const { register, handleSubmit, control, watch, setValue, formState: { errors }, reset } = useForm<PartnerUpdateFormData>({
     resolver: zodResolver(partnerUpdateSchema),
+  });
+
+  // Watch the type field to show/hide groupe selection
+  const selectedType = watch('type');
+
+  // Get active group from user (for ADMIN, company_name stores groupe_id)
+  const getActiveGroupeId = () => {
+    if (!user?.company_name) return null;
+    
+    // Check if company_name is a valid UUID (groupe_id)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(user.company_name)) {
+      return user.company_name;
+    }
+    
+    // For ADMIN, always use company_name as groupe_id
+    if (user.role === UserRole.ADMIN) {
+      return user.company_name;
+    }
+    
+    return null;
+  };
+
+  const activeGroupeIdFromUser = getActiveGroupeId();
+
+  // Fetch all active groupes (for ADMIN if no groupe_id is detected)
+  const { data: groupesData } = useQuery({
+    queryKey: ['groupes', 'active'],
+    queryFn: () => groupeService.list({ limit: 100, is_active: true }),
+    enabled: user?.role === UserRole.ADMIN && activeGroupeIdFromUser === 'FETCH_FIRST_ACTIVE',
+  });
+
+  // Determine the actual active groupe ID
+  const activeGroupeId = activeGroupeIdFromUser === 'FETCH_FIRST_ACTIVE' 
+    ? (groupesData && groupesData.length > 0 ? groupesData[0].id : null)
+    : activeGroupeIdFromUser;
+
+  // Fetch active groupes for DISTRIBUTEUR type
+  const { data: groupes, isLoading: isLoadingGroupes } = useQuery({
+    queryKey: ['groupes', 'active'],
+    queryFn: () => groupeService.list({ limit: 100, is_active: true }),
+    enabled: selectedType === PartnerType.DISTRIBUTEUR || partner?.type === PartnerType.DISTRIBUTEUR,
   });
 
   // Reset form when partner data is loaded
@@ -29,6 +74,7 @@ const EditPartnerPage = () => {
       reset({
         name: partner.name,
         type: partner.type,
+        groupe_id: partner.groupe_id || (partner.type === PartnerType.DISTRIBUTEUR && activeGroupeId ? activeGroupeId : undefined),
         address: partner.address || '',
         city: partner.city || '',
         postal_code: partner.postal_code || '',
@@ -39,19 +85,33 @@ const EditPartnerPage = () => {
         notes: partner.notes || '',
       });
     }
-  }, [partner, reset]);
+  }, [partner, reset, activeGroupeId]);
 
   const updateMutation = useMutation({
     mutationFn: (data: PartnerUpdateFormData) => {
-      // Ensure type is properly cast to PartnerType if present
-      const payload = {
+      // Build payload with proper type casting
+      const payload: any = {
         ...data,
         type: data.type ? (data.type as PartnerType) : undefined,
       };
-      return partnerService.update(id!, payload as any);
+      
+      // Handle groupe_id: include it if provided, or set to null if explicitly cleared
+      if (data.groupe_id !== undefined) {
+        if (data.groupe_id && data.groupe_id.trim() !== '') {
+          payload.groupe_id = data.groupe_id.trim();
+        } else {
+          // Empty string means clear the groupe_id
+          payload.groupe_id = null;
+        }
+      }
+      // If groupe_id is not in data, don't include it (partial update)
+      
+      console.log('Updating partner with payload:', payload);
+      return partnerService.update(id!, payload);
     },
     onSuccess: () => {
       navigate(`/partners/${id}`);
+      window.location.reload();
     },
   });
 
@@ -106,12 +166,19 @@ const EditPartnerPage = () => {
                       options={[
                         { value: '', label: 'Sélectionner un type' },
                         { value: PartnerType.GROSSISTE, label: 'Grossiste' },
-                        { value: PartnerType.FOURNISSEUR, label: 'Fournisseur' },
+                        { value: PartnerType.DISTRIBUTEUR, label: 'Distributeur' },
                         { value: PartnerType.TRANSPORTEUR, label: 'Transporteur' },
                         { value: PartnerType.AUTRE, label: 'Autre' },
                       ]}
                       onChange={(e) => {
                         field.onChange(e.target.value as PartnerType);
+                        // Reset groupe_id when type changes
+                        if (e.target.value !== PartnerType.DISTRIBUTEUR) {
+                          setValue('groupe_id', undefined);
+                        } else if (!watch('groupe_id') && activeGroupeId) {
+                          // Auto-fill with active groupe if available
+                          setValue('groupe_id', activeGroupeId);
+                        }
                       }}
                     />
                   )}
@@ -120,6 +187,55 @@ const EditPartnerPage = () => {
                   <p className="mt-1 text-sm text-destructive">{errors.type.message}</p>
                 )}
               </div>
+
+              {(selectedType === PartnerType.DISTRIBUTEUR || partner?.type === PartnerType.DISTRIBUTEUR) && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Groupe {partner?.type === PartnerType.DISTRIBUTEUR ? '*' : ''}
+                  </label>
+                  <Controller
+                    name="groupe_id"
+                    control={control}
+                    render={({ field }) => (
+                      <>
+                        <Select
+                          value={field.value || ''}
+                          options={[
+                            { value: '', label: isLoadingGroupes ? 'Chargement...' : 'Sélectionner un groupe' },
+                            ...(groupes?.map((groupe) => ({
+                              value: groupe.id,
+                              label: groupe.name,
+                            })) || []),
+                          ]}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            field.onChange(value && value.trim() !== '' ? value : undefined);
+                          }}
+                          disabled={isLoadingGroupes}
+                        />
+                        {isLoadingGroupes && (
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            Chargement des groupes...
+                          </p>
+                        )}
+                        {!isLoadingGroupes && (!groupes || groupes.length === 0) && (
+                          <p className="mt-1 text-sm text-amber-600">
+                            Aucun groupe actif disponible. Veuillez créer un groupe d'abord.
+                          </p>
+                        )}
+                        {activeGroupeId && !field.value && (
+                          <p className="mt-1 text-sm text-blue-600">
+                            💡 Votre groupe actif ({groupes?.find(g => g.id === activeGroupeId)?.name || 'Groupe actif'}) peut être sélectionné automatiquement.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  />
+                  {errors.groupe_id && (
+                    <p className="mt-1 text-sm text-destructive">{errors.groupe_id.message}</p>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium mb-1">Adresse</label>

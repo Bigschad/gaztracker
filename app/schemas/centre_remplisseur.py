@@ -22,25 +22,12 @@ class CentreRemplisseurBase(BaseModel):
     city: Optional[str] = Field(None, max_length=100, description="City where the filling center is located")
     postal_code: Optional[str] = Field(None, max_length=20, description="Postal code of the filling center")
     country: Optional[str] = Field("Côte d'Ivoire", max_length=100, description="Country of the filling center")
-    phone: Optional[str] = Field(None, max_length=20, description="Phone number of the filling center")
+    phone: Optional[str] = Field(None, max_length=20, description="Phone number of t he filling center")
     email: Optional[EmailStr] = Field(None, description="Email address of the filling center")
     contact_name: Optional[str] = Field(None, max_length=255, description="Name of the contact person")
     contact_phone: Optional[str] = Field(None, max_length=20, description="Phone number of the contact person")
     is_active: bool = Field(True, description="Whether the filling center is active")
-    latitude: Optional[float] = Field(None, ge=-90, le=90, description="GPS latitude")
-    longitude: Optional[float] = Field(None, ge=-180, le=180, description="GPS longitude")
     notes: Optional[str] = Field(None, max_length=1000, description="Additional notes")
-    
-    @field_validator('latitude', 'longitude')
-    @classmethod
-    def validate_coordinates(cls, v, info):
-        """Validate GPS coordinates."""
-        if v is not None:
-            if info.field_name == 'latitude' and not (-90 <= v <= 90):
-                raise ValueError('Latitude must be between -90 and 90')
-            if info.field_name == 'longitude' and not (-180 <= v <= 180):
-                raise ValueError('Longitude must be between -180 and 180')
-        return v
 
 
 # Schema for creating a new CentreRemplisseur
@@ -65,8 +52,6 @@ class CentreRemplisseurUpdate(BaseModel):
     contact_name: Optional[str] = Field(None, max_length=255)
     contact_phone: Optional[str] = Field(None, max_length=20)
     is_active: Optional[bool] = None
-    latitude: Optional[float] = Field(None, ge=-90, le=90)
-    longitude: Optional[float] = Field(None, ge=-180, le=180)
     notes: Optional[str] = Field(None, max_length=1000)
 
 

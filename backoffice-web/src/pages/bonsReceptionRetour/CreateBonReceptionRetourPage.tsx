@@ -46,6 +46,7 @@ const CreateBonReceptionRetourPage = () => {
       queryClient.invalidateQueries({ queryKey: ['bons-reception-retour'] });
       alert('Bon de réception retour créé avec succès');
       navigate(`/bons-reception-retour/${data.id}`);
+      window.location.reload();
     },
     onError: (error: any) => {
       alert(error.response?.data?.detail || 'Erreur lors de la création');

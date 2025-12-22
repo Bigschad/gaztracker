@@ -47,7 +47,7 @@ class GroupeService:
             ).scalar_one_or_none()
             
             if existing_email:
-                raise DuplicateException(f"Groupe with email '{schema.email}' already exists")
+                raise DuplicateException("Groupe", "email", schema.email)
         
         # Create new Groupe
         groupe = Groupe(**schema.model_dump())
@@ -77,7 +77,7 @@ class GroupeService:
         ).scalar_one_or_none()
         
         if not groupe:
-            raise NotFoundException(f"Groupe with ID {groupe_id} not found")
+            raise NotFoundException("Groupe", groupe_id)
         
         return groupe
     
@@ -185,7 +185,7 @@ class GroupeService:
             ).scalar_one_or_none()
             
             if existing:
-                raise DuplicateException(f"Groupe with code '{schema.code}' already exists")
+                raise DuplicateException("Groupe", "code", schema.code)
         
         # Check for duplicate email if being updated
         if schema.email and schema.email != groupe.email:
@@ -197,7 +197,7 @@ class GroupeService:
             ).scalar_one_or_none()
             
             if existing_email:
-                raise DuplicateException(f"Groupe with email '{schema.email}' already exists")
+                raise DuplicateException("Groupe", "email", schema.email)
         
         # Update attributes
         update_data = schema.model_dump(exclude_unset=True)

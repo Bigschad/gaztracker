@@ -153,6 +153,8 @@ class GrandDistributeur(Base, TimestampMixin):
     centres_remplisseurs = relationship(
         "CentreRemplisseur",
         back_populates="grand_distributeur",
+        foreign_keys="CentreRemplisseur.grand_distributeur_id",
+        primaryjoin="GrandDistributeur.id == CentreRemplisseur.grand_distributeur_id",
         cascade="all, delete-orphan",
         lazy="dynamic"
     )

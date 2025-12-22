@@ -1,10 +1,34 @@
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common';
 import { useAuth } from '../../hooks/useAuth';
-import { Mail, Phone, Shield, Calendar } from 'lucide-react';
+import { Mail, Phone, Shield, Calendar, Building2 } from 'lucide-react';
 import { formatDate } from '../../utils/formatters';
+import { useQuery } from '@tanstack/react-query';
+import { groupeService } from '../../services/api/groupeService';
+import { centreRemplisseurService } from '../../services/api/centreRemplisseurService';
+import { partnerService } from '../../services/api/partnerService';
+import { UserRole } from '../../types/user';
 
 const ProfilePage = () => {
   const { user } = useAuth();
+
+  // Fetch data based on user role
+  const { data: groupes } = useQuery({
+    queryKey: ['groupes', 'user-profile'],
+    queryFn: () => groupeService.list({ limit: 100, is_active: true }),
+    enabled: user?.role === UserRole.ADMIN,
+  });
+
+  const { data: centres } = useQuery({
+    queryKey: ['centres-remplisseurs', 'user-profile'],
+    queryFn: () => centreRemplisseurService.list({ limit: 100, is_active: true }),
+    enabled: user?.role === UserRole.OPERATEUR_USINE || user?.role === UserRole.RESPONSABLE_LOGISTIQUE,
+  });
+
+  const { data: partnersData } = useQuery({
+    queryKey: ['partners', 'user-profile', 'transporteur'],
+    queryFn: () => partnerService.list({ page: 1, page_size: 100, type: 'TRANSPORTEUR', is_active: true }),
+    enabled: user?.role === UserRole.CHAUFFEUR,
+  });
 
   if (!user) {
     return <div>Chargement...</div>;
@@ -16,7 +40,6 @@ const ProfilePage = () => {
       RESPONSABLE_LOGISTIQUE: 'Responsable Logistique',
       OPERATEUR_USINE: 'Opérateur Usine',
       CHAUFFEUR: 'Chauffeur',
-      GROSSISTE: 'Grossiste',
     };
     return roleLabels[role] || role;
   };
@@ -130,6 +153,89 @@ const ProfilePage = () => {
               </button>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Company/Enterprise Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            Entreprise
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Admin: Show Groups */}
+          {user.role === UserRole.ADMIN && (
+            <div>
+              <h3 className="font-medium mb-3">Groupes</h3>
+              {groupes && groupes.length > 0 ? (
+                <div className="space-y-2">
+                  {groupes.map((groupe) => (
+                    <div key={groupe.id} className="p-3 border rounded-lg hover:bg-accent transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{groupe.name}</p>
+                          <p className="text-sm text-muted-foreground">{groupe.code}</p>
+                        </div>
+                        <div className={`h-2 w-2 rounded-full ${groupe.is_active ? 'bg-green-500' : 'bg-gray-300'}`} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Aucun groupe disponible</p>
+              )}
+            </div>
+          )}
+
+          {/* Factory Operator & Logistics Manager: Show Filling Centers */}
+          {(user.role === UserRole.OPERATEUR_USINE || user.role === UserRole.RESPONSABLE_LOGISTIQUE) && (
+            <div>
+              <h3 className="font-medium mb-3">Centres de Remplissage</h3>
+              {centres && centres.length > 0 ? (
+                <div className="space-y-2">
+                  {centres.map((centre) => (
+                    <div key={centre.id} className="p-3 border rounded-lg hover:bg-accent transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{centre.name}</p>
+                          <p className="text-sm text-muted-foreground">{centre.code} • {centre.city}</p>
+                        </div>
+                        <div className={`h-2 w-2 rounded-full ${centre.is_active ? 'bg-green-500' : 'bg-gray-300'}`} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Aucun centre de remplissage disponible</p>
+              )}
+            </div>
+          )}
+
+          {/* Driver: Show Transport Partners */}
+          {user.role === UserRole.CHAUFFEUR && (
+            <div>
+              <h3 className="font-medium mb-3">Partenaires Transporteurs</h3>
+              {partnersData?.items && partnersData.items.length > 0 ? (
+                <div className="space-y-2">
+                  {partnersData.items.map((partner) => (
+                    <div key={partner.id} className="p-3 border rounded-lg hover:bg-accent transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{partner.name}</p>
+                          <p className="text-sm text-muted-foreground">{partner.code ? `${partner.code} • ` : ''}{partner.city || 'N/A'}</p>
+                        </div>
+                        <div className={`h-2 w-2 rounded-full ${partner.is_active ? 'bg-green-500' : 'bg-gray-300'}`} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Aucun partenaire transporteur disponible</p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

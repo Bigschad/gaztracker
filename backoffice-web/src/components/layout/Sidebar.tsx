@@ -16,6 +16,7 @@ import {
   FileText,
   ChevronDown,
   ChevronRight,
+  Store,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { GroupeLogo } from './GroupeLogo';
@@ -109,6 +110,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           name: 'Centres Remplisseurs',
           path: '/centres-remplisseurs',
           icon: Factory,
+        },
+        {
+          name: 'Distributeurs',
+          path: '/distributeurs',
+          icon: Store,
         },
         {
           name: 'Groupes',

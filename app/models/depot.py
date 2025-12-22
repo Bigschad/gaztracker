@@ -27,13 +27,8 @@ class Depot(Base, TimestampMixin):
         address: Address
         city: City
         postal_code: Postal code
-        latitude: GPS latitude
-        longitude: GPS longitude
         contact_name: Contact person name
         contact_phone: Contact person phone
-        capacity_b28: Capacity for B28 palettes
-        capacity_b12: Capacity for B12 palettes
-        capacity_b6: Capacity for B6 palettes
         is_active: Whether the depot is active
         is_main_depot: Whether this is the main depot of the partner
         notes: Additional notes
@@ -97,19 +92,6 @@ class Depot(Base, TimestampMixin):
         comment="Postal code"
     )
     
-    # GPS Coordinates
-    latitude = Column(
-        Float,
-        nullable=True,
-        comment="GPS latitude"
-    )
-    
-    longitude = Column(
-        Float,
-        nullable=True,
-        comment="GPS longitude"
-    )
-    
     # Contact Information
     contact_name = Column(
         String(255),
@@ -121,25 +103,6 @@ class Depot(Base, TimestampMixin):
         String(20),
         nullable=True,
         comment="Contact person phone"
-    )
-    
-    # Capacity
-    capacity_b28 = Column(
-        Integer,
-        nullable=True,
-        comment="Capacity for B28 palettes"
-    )
-    
-    capacity_b12 = Column(
-        Integer,
-        nullable=True,
-        comment="Capacity for B12 palettes"
-    )
-    
-    capacity_b6 = Column(
-        Integer,
-        nullable=True,
-        comment="Capacity for B6 palettes"
     )
     
     # Status
@@ -212,7 +175,6 @@ class Depot(Base, TimestampMixin):
         Index("ix_depots_name_active", "name", "is_active"),
         Index("ix_depots_partner", "partner_id", "is_active"),
         Index("ix_depots_main", "partner_id", "is_main_depot"),
-        Index("ix_depots_location", "latitude", "longitude"),
     )
     
     def __repr__(self) -> str:
@@ -224,14 +186,4 @@ class Depot(Base, TimestampMixin):
         """Get full address as a string."""
         parts = [self.address, self.city, self.postal_code]
         return ", ".join(filter(None, parts))
-    
-    @property
-    def has_location(self) -> bool:
-        """Check if depot has GPS coordinates."""
-        return self.latitude is not None and self.longitude is not None
-    
-    @property
-    def total_capacity(self) -> int:
-        """Get total capacity across all palette types."""
-        return (self.capacity_b28 or 0) + (self.capacity_b12 or 0) + (self.capacity_b6 or 0)
 

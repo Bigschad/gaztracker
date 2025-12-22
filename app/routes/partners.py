@@ -14,6 +14,7 @@ from app.database import get_sync_db
 from app.middleware.auth_middleware import get_current_user_sync
 from app.models.user import User, UserRole
 from app.models.partner import Partner, PartnerType
+from sqlalchemy.orm import joinedload
 from app.schemas.partner import (
     PartnerCreate,
     PartnerUpdate,
@@ -60,6 +61,10 @@ def create_partner(
     db.commit()
     db.refresh(new_partner)
     
+    # Load groupe relationship if needed
+    if new_partner.groupe_id:
+        db.refresh(new_partner, ['groupe'])
+    
     return PartnerResponse.model_validate(new_partner)
 
 
@@ -73,7 +78,8 @@ def create_partner(
 def list_partners(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
-    type: Optional[str] = Query(None, description="Filter by partner type (GROSSISTE, FOURNISSEUR, TRANSPORTEUR, AUTRE)"),
+    type: Optional[str] = Query(None, description="Filter by partner type (GROSSISTE, DISTRIBUTEUR, TRANSPORTEUR, AUTRE)"),
+    groupe_id: Optional[UUID] = Query(None, description="Filter by groupe ID (for DISTRIBUTEUR)"),
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
     search: Optional[str] = Query(None, description="Search in name, email, phone"),
     current_user: User = Depends(get_current_user_sync),
@@ -102,14 +108,16 @@ def list_partners(
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Invalid partner type value: {type}. Must be one of: GROSSISTE, FOURNISSEUR, TRANSPORTEUR, AUTRE"
+                detail=f"Invalid partner type value: {type}. Must be one of: GROSSISTE, DISTRIBUTEUR, TRANSPORTEUR, AUTRE"
             )
     
-    query = db.query(Partner)
+    query = db.query(Partner).options(joinedload(Partner.groupe))
     
     # Apply filters
     if type_enum:
         query = query.filter(Partner.type == type_enum)
+    if groupe_id:
+        query = query.filter(Partner.groupe_id == groupe_id)
     if is_active is not None:
         query = query.filter(Partner.is_active == is_active)
     if search:
@@ -162,7 +170,7 @@ def get_partner(
     Returns:
         Partner details
     """
-    partner = db.query(Partner).filter(Partner.id == partner_id).first()
+    partner = db.query(Partner).options(joinedload(Partner.groupe)).filter(Partner.id == partner_id).first()
     if not partner:
         raise ResourceNotFoundException(f"Partenaire avec l'ID {partner_id} introuvable")
     
@@ -210,7 +218,12 @@ def update_partner(
         setattr(partner, field, value)
     
     db.commit()
-    db.refresh(partner)
+    
+    # Refresh with groupe relationship if groupe_id was updated
+    if 'groupe_id' in update_dict:
+        db.refresh(partner, ['groupe'])
+    else:
+        db.refresh(partner)
     
     return PartnerResponse.model_validate(partner)
 

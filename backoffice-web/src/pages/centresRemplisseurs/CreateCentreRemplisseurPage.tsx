@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
@@ -5,32 +6,71 @@ import { centreRemplisseurService, partnerService } from '../../services/api';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from '../../components/common';
 import { ArrowLeft } from 'lucide-react';
 import { CentreRemplisseurCreate } from '../../types';
+import { useToast } from '../../hooks/useToast';
+import { getErrorDetails } from '../../utils/errorMessages';
 
 const CreateCentreRemplisseurPage = () => {
   const navigate = useNavigate();
+  const { showToast, ToastContainer } = useToast();
 
-  // Fetch partners of type GROSSISTE (Distributeur)
+  // Fetch next available code
+  const { data: nextCodeData } = useQuery({
+    queryKey: ['centres-remplisseurs', 'next-code'],
+    queryFn: () => centreRemplisseurService.getNextCode(),
+  });
+
+  const nextCode = nextCodeData?.code || '';
+
+  // Fetch partners of type DISTRIBUTEUR
   const { data: partnersData } = useQuery({
-    queryKey: ['partners', 'GROSSISTE'],
+    queryKey: ['partners', 'DISTRIBUTEUR', 'centres-remplisseurs'],
     queryFn: () => partnerService.list({
       page: 1,
       page_size: 100,
-      type: 'GROSSISTE',
+      type: 'DISTRIBUTEUR',
       is_active: true,
     }),
   });
 
-  const { register, handleSubmit, formState: { errors }, control } = useForm<CentreRemplisseurCreate>({
+  // Filter to ensure only DISTRIBUTEUR partners are shown
+  const distributeurs = partnersData?.items?.filter(partner => partner.type === 'DISTRIBUTEUR') || [];
+
+  const { register, handleSubmit, formState: { errors }, control, setValue } = useForm<CentreRemplisseurCreate>({
     defaultValues: {
       is_active: true,
       country: "Côte d'Ivoire",
     },
   });
 
+  // Set the auto-generated code when it's loaded
+  useEffect(() => {
+    if (nextCode) {
+      setValue('code', nextCode);
+    }
+  }, [nextCode, setValue]);
+
   const createMutation = useMutation({
     mutationFn: (data: CentreRemplisseurCreate) => centreRemplisseurService.create(data),
     onSuccess: (data) => {
+      showToast({
+        type: 'success',
+        title: 'Succès',
+        message: 'Centre remplisseur créé avec succès',
+        duration: 3000,
+      });
+      setTimeout(() => {
       navigate(`/centres-remplisseurs/${data.id}`);
+        window.location.reload();
+      }, 500);
+    },
+    onError: (error) => {
+      const errorDetails = getErrorDetails(error);
+      showToast({
+        type: 'error',
+        title: errorDetails.title,
+        message: errorDetails.message,
+        duration: 7000,
+      });
     },
   });
 
@@ -40,6 +80,7 @@ const CreateCentreRemplisseurPage = () => {
 
   return (
     <div className="w-full">
+      <ToastContainer />
       <div className="mb-6">
         <Link to="/centres-remplisseurs">
           <Button variant="ghost" size="sm">
@@ -67,6 +108,21 @@ const CreateCentreRemplisseurPage = () => {
               </div>
 
               <div>
+                <label className="block text-sm font-medium mb-1">Code *</label>
+                <Input
+                  error={errors.code?.message}
+                  {...register('code')}
+                  value={nextCode}
+                  disabled
+                  className="bg-gray-100 cursor-not-allowed"
+                  placeholder="Génération automatique..."
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Code généré automatiquement
+                </p>
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium mb-1">Distributeur *</label>
                 <Controller
                   name="partner_id"
@@ -76,12 +132,11 @@ const CreateCentreRemplisseurPage = () => {
                     <select
                       {...field}
                       className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      error={errors.partner_id?.message}
                     >
                       <option value="">Sélectionner un distributeur</option>
-                      {partnersData?.items.map((partner) => (
+                      {distributeurs.map((partner) => (
                         <option key={partner.id} value={partner.id}>
-                          {partner.name} {partner.code ? `(${partner.code})` : ''}
+                          {partner.name}
                         </option>
                       ))}
                     </select>
@@ -90,9 +145,6 @@ const CreateCentreRemplisseurPage = () => {
                 {errors.partner_id && (
                   <p className="mt-1 text-xs text-red-600">{errors.partner_id.message}</p>
                 )}
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Le code sera généré automatiquement.
-                </p>
               </div>
 
               <div>

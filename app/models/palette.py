@@ -65,6 +65,17 @@ class PaletteStatus(str, enum.Enum):
     OUT = "OUT"
 
 
+class PaletteCondition(str, enum.Enum):
+    """
+    Condition/State of a palette.
+
+    - NEUVE: New palette (never used)
+    - RECONDITIONNEE: Refurbished/reconditioned palette
+    """
+    NEUVE = "NEUVE"
+    RECONDITIONNEE = "RECONDITIONNEE"
+
+
 class Palette(Base, TimestampMixin):
     """
     Palette model for tracking gas bottle pallets.
@@ -130,6 +141,15 @@ class Palette(Base, TimestampMixin):
         nullable=False,
         index=True,
         comment="Type of gas bottles (B6, B12, B28)"
+    )
+
+    # Condition (Neuve ou Reconditionnée)
+    condition = Column(
+        SQLEnum(PaletteCondition, name="palette_condition", create_type=True),
+        nullable=True,
+        default=PaletteCondition.NEUVE,
+        index=True,
+        comment="Condition de la palette (NEUVE ou RECONDITIONNEE)"
     )
 
     # Capacity (capacité - nombre de bouteilles possible)
@@ -335,7 +355,9 @@ class Palette(Base, TimestampMixin):
 
     def can_be_assigned_for_delivery(self) -> bool:
         """Check if palette can be assigned to a bon d'enlèvement."""
-        return self.status == PaletteStatus.AU_CENTRE and self.is_full
+        # Allow palettes in CREATION or AU_CENTRE status if they are full
+        # A newly created palette at a centre can be assigned immediately
+        return self.is_full and self.status in [PaletteStatus.CREATION, PaletteStatus.AU_CENTRE]
 
     def can_be_returned(self) -> bool:
         """Check if palette can be returned to center."""

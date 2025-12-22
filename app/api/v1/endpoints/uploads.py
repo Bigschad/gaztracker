@@ -102,6 +102,20 @@ def upload_logo(
         file.file.close()
 
 
+def get_media_type(filename: str) -> str:
+    """Determine media type based on file extension."""
+    ext = os.path.splitext(filename)[1].lower()
+    media_types = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.svg': 'image/svg+xml',
+        '.webp': 'image/webp',
+    }
+    return media_types.get(ext, 'image/png')  # Default to PNG if unknown
+
+
 @router.get("/logos/{filename}")
 def get_logo(filename: str):
     """
@@ -112,12 +126,22 @@ def get_logo(filename: str):
     file_path = LOGOS_DIR / filename
     
     if not file_path.exists():
+        # Return 404 with proper headers to prevent Nginx from trying to serve it
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Logo non trouvé"
         )
     
-    return FileResponse(file_path)
+    # Determine correct media type based on file extension
+    media_type = get_media_type(filename)
+    
+    return FileResponse(
+        file_path,
+        media_type=media_type,
+        headers={
+            "Cache-Control": "public, max-age=31536000",  # Cache for 1 year
+        }
+    )
 
 
 @router.delete("/logos/{filename}", status_code=status.HTTP_204_NO_CONTENT)

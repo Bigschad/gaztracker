@@ -1,9 +1,12 @@
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Dialog, Input, Select, Button } from '../common';
 import { userService } from '../../services/api';
+import { groupeService } from '../../services/api/groupeService';
+import { centreRemplisseurService } from '../../services/api/centreRemplisseurService';
+import { partnerService } from '../../services/api/partnerService';
 import { User, UserRole, UserCreate, UserUpdate } from '../../types';
 import { useState, useEffect } from 'react';
 
@@ -50,6 +53,9 @@ export const UserFormDialog = ({ isOpen, onClose, user }: UserFormDialogProps) =
     handleSubmit,
     formState: { errors },
     reset,
+    watch,
+    control,
+    setValue,
   } = useForm<UserFormData>({
     resolver: zodResolver(isEditMode ? userUpdateSchema : userCreateSchema),
     defaultValues: user ? {
@@ -140,8 +146,81 @@ export const UserFormDialog = ({ isOpen, onClose, user }: UserFormDialogProps) =
     { value: UserRole.RESPONSABLE_LOGISTIQUE, label: 'Responsable Logistique' },
     { value: UserRole.OPERATEUR_USINE, label: 'Opérateur Usine' },
     { value: UserRole.CHAUFFEUR, label: 'Chauffeur' },
-    { value: UserRole.GROSSISTE, label: 'Grossiste' },
   ];
+
+  // Watch the role to determine which company list to show
+  const selectedRole = watch('role') || user?.role || UserRole.OPERATEUR_USINE;
+
+  // Fetch groups for ADMIN
+  const { data: groupes } = useQuery({
+    queryKey: ['groupes', 'user-form'],
+    queryFn: () => groupeService.list({ limit: 100, is_active: true }),
+    enabled: selectedRole === UserRole.ADMIN,
+  });
+
+  // Fetch centres remplisseurs for OPERATEUR_USINE and RESPONSABLE_LOGISTIQUE
+  const { data: centres } = useQuery({
+    queryKey: ['centres-remplisseurs', 'user-form'],
+    queryFn: () => centreRemplisseurService.list({ limit: 100, is_active: true }),
+    enabled: selectedRole === UserRole.OPERATEUR_USINE || selectedRole === UserRole.RESPONSABLE_LOGISTIQUE,
+  });
+
+  // Fetch transport partners for CHAUFFEUR
+  const { data: partnersData } = useQuery({
+    queryKey: ['partners', 'user-form', 'transporteur'],
+    queryFn: () => partnerService.list({ page: 1, page_size: 100, type: 'TRANSPORTEUR', is_active: true }),
+    enabled: selectedRole === UserRole.CHAUFFEUR,
+  });
+
+  // Track previous role to detect changes
+  const [previousRole, setPreviousRole] = useState<string | undefined>(selectedRole);
+
+  // Reset company_name when role changes (but not on initial load)
+  useEffect(() => {
+    if (previousRole && previousRole !== selectedRole && isOpen) {
+      setValue('company_name', '');
+    }
+    setPreviousRole(selectedRole);
+  }, [selectedRole, setValue, previousRole, isOpen]);
+
+  // Build company options based on role
+  const getCompanyOptions = () => {
+    if (selectedRole === UserRole.ADMIN && groupes) {
+      return groupes.map((groupe) => ({
+        value: groupe.id,
+        label: `${groupe.name} (${groupe.code})`,
+      }));
+    }
+    if ((selectedRole === UserRole.OPERATEUR_USINE || selectedRole === UserRole.RESPONSABLE_LOGISTIQUE) && centres) {
+      return centres.map((centre) => ({
+        value: centre.id,
+        label: `${centre.name} (${centre.code})`,
+      }));
+    }
+    if (selectedRole === UserRole.CHAUFFEUR && partnersData?.items) {
+      return partnersData.items.map((partner) => ({
+        value: partner.id,
+        label: `${partner.name}${partner.code ? ` (${partner.code})` : ''}`,
+      }));
+    }
+    return [];
+  };
+
+  const companyOptions = getCompanyOptions();
+  const showCompanySelect = selectedRole === UserRole.ADMIN || 
+                            selectedRole === UserRole.OPERATEUR_USINE || 
+                            selectedRole === UserRole.RESPONSABLE_LOGISTIQUE || 
+                            selectedRole === UserRole.CHAUFFEUR;
+
+  // Get company label based on role
+  const getCompanyLabel = () => {
+    if (selectedRole === UserRole.ADMIN) return 'Groupe';
+    if (selectedRole === UserRole.OPERATEUR_USINE || selectedRole === UserRole.RESPONSABLE_LOGISTIQUE) {
+      return 'Centre de Remplissage';
+    }
+    if (selectedRole === UserRole.CHAUFFEUR) return 'Partenaire Transporteur';
+    return 'Entreprise';
+  };
 
   return (
     <Dialog
@@ -188,19 +267,38 @@ export const UserFormDialog = ({ isOpen, onClose, user }: UserFormDialogProps) =
             placeholder="+33 6 12 34 56 78"
           />
 
-          <Input
-            label="Entreprise"
-            {...register('company_name')}
-            error={errors.company_name?.message}
-            placeholder="Nom de l'entreprise (optionnel)"
-          />
-
           <Select
             label="Rôle"
             {...register('role')}
             error={errors.role?.message}
             options={roleOptions}
           />
+
+          {showCompanySelect ? (
+            <Controller
+              name="company_name"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label={getCompanyLabel()}
+                  {...field}
+                  error={errors.company_name?.message}
+                  options={[
+                    { value: '', label: `Sélectionner un ${getCompanyLabel().toLowerCase()}` },
+                    ...companyOptions,
+                  ]}
+                  disabled={companyOptions.length === 0}
+                />
+              )}
+            />
+          ) : (
+            <Input
+              label="Entreprise"
+              {...register('company_name')}
+              error={errors.company_name?.message}
+              placeholder="Nom de l'entreprise (optionnel)"
+            />
+          )}
 
           {!isEditMode && (
             <Input

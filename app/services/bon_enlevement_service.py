@@ -8,6 +8,7 @@ from typing import Optional, List
 from uuid import UUID
 from datetime import datetime, timedelta
 import secrets
+import logging
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 
@@ -17,7 +18,10 @@ from app.models.partner import Partner
 from app.models.depot import Depot
 from app.models.palette import Palette, PaletteStatus
 from app.models.palette_movement import PaletteMovement, MovementAction
-from app.models.user import User
+from app.models.user import User, UserRole
+from app.services.notification_service import NotificationService
+from app.schemas.notification import NotificationCreate
+from app.models.notification import NotificationType, NotificationChannel
 from app.schemas.bon_enlevement import (
     BonEnlevementCreate,
     BonEnlevementUpdate,
@@ -113,13 +117,64 @@ class BonEnlevementService:
         numero_bon = BonEnlevementService._generate_numero_bon()
         
         # Create Bon d'Enlèvement
-        bon_data = schema.model_dump()
+        bon_data = schema.model_dump(exclude_none=False)  # Include None values for optional fields
+        palette_ids = bon_data.pop('palette_ids', None)  # Extract palette_ids before creating bon
         bon_data['numero_bon'] = numero_bon
         bon_data['status'] = BonEnlevementStatus.CREATION
         bon_data['date_creation'] = datetime.utcnow()
         
         bon = BonEnlevement(**bon_data)
         db.add(bon)
+        db.flush()  # Flush to get bon.id
+        
+        # If palettes are provided, validate and assign them
+        if palette_ids:
+            for palette_id in palette_ids:
+                palette = db.execute(
+                    select(Palette).where(Palette.id == palette_id)
+                ).scalar_one_or_none()
+                
+                if not palette:
+                    raise NotFoundException(f"Palette {palette_id} not found")
+                
+                # Check if palette can be assigned (allows CREATION and AU_CENTRE status if full)
+                can_assign = palette.can_be_assigned_for_delivery()
+                if not can_assign:
+                    raise BusinessRuleException(
+                        f"Palette {palette_id} not available for delivery (status: {palette.status}, full: {palette.is_full}, can_assign: {can_assign})"
+                    )
+                
+                # Verify palette is at the selected centre (if current_centre_remplisseur_id is set)
+                if palette.current_centre_remplisseur_id and palette.current_centre_remplisseur_id != bon.centre_remplisseur_id:
+                    raise ValidationException(
+                        f"Palette {palette_id} is not at the selected centre remplisseur (current: {palette.current_centre_remplisseur_id}, expected: {bon.centre_remplisseur_id})"
+                    )
+                
+                # If palette doesn't have a centre, set it to the bon's centre
+                if not palette.current_centre_remplisseur_id:
+                    palette.current_centre_remplisseur_id = bon.centre_remplisseur_id
+                
+                # Assign palette to bon (status will change to EN_CHARGEMENT when bon is validated)
+                palette.bon_enlevement_actuel_id = bon.id
+                
+                # If palette is in CREATION status, update it to AU_CENTRE since it's now at the centre
+                status_before = palette.status
+                if palette.status == PaletteStatus.CREATION:
+                    palette.status = PaletteStatus.AU_CENTRE
+                
+                # Create movement record (palette stays in AU_CENTRE status until loading)
+                movement = PaletteMovement(
+                    palette_id=palette.id,
+                    bon_enlevement_id=bon.id,
+                    centre_remplisseur_id=bon.centre_remplisseur_id,
+                    user_id=created_by_id,
+                    action=MovementAction.CHARGEMENT_CENTRE,
+                    status_before=status_before.value,
+                    status_after=palette.status.value,  # Status is AU_CENTRE (or was already AU_CENTRE)
+                    notes=f"Assignée au Bon d'Enlèvement {bon.numero_bon} lors de la création"
+                )
+                db.add(movement)
+        
         db.commit()
         db.refresh(bon)
         
@@ -255,7 +310,40 @@ class BonEnlevementService:
         db.commit()
         db.refresh(bon)
         
-        # TODO: Send OTP to grossiste via SMS/Email
+        # Send notifications to OPERATEUR_USINE and CHAUFFEUR users at the centre
+        try:
+            notification_service = NotificationService(db)
+            centre_id_str = str(bon.centre_remplisseur_id)
+            
+            # Find OPERATEUR_USINE and CHAUFFEUR users associated with this centre
+            users_to_notify = db.execute(
+                select(User).where(
+                    User.company_name == centre_id_str,
+                    User.role.in_([UserRole.OPERATEUR_USINE, UserRole.CHAUFFEUR]),
+                    User.is_active == True
+                )
+            ).scalars().all()
+            
+            # Send notification to each user
+            for user in users_to_notify:
+                notification_data = NotificationCreate(
+                    type=NotificationType.VALIDATION_REQUISE,
+                    channel=NotificationChannel.EMAIL if user.email else NotificationChannel.SMS,
+                    recipient_email=user.email if user.email else None,
+                    recipient_phone=user.phone_number if user.phone_number else None,
+                    subject=f"Bon d'Enlèvement {bon.numero_bon} validé",
+                    message=f"Le bon d'Enlèvement {bon.numero_bon} a été validé. Vous pouvez maintenant démarrer le chargement des palettes."
+                )
+                try:
+                    notification_service.send_notification_now(notification_data)
+                except Exception as e:
+                    # Log error but don't fail the validation
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Failed to send notification to user {user.id}: {e}")
+        except Exception as e:
+            # Log error but don't fail the validation
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to send validation notifications: {e}")
         
         return bon
     

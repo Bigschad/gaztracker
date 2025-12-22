@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common';
 import { reportService } from '../../services/api';
-import { Package, Truck, Bell, TrendingUp } from 'lucide-react';
+import { Package, Truck, Bell, TrendingUp, MapPin } from 'lucide-react';
 import { formatNumber, formatPercentage } from '../../utils/formatters';
+import { DepotsMap } from '../../components/map/DepotsMap';
 
 const DashboardPage = () => {
   const { data: dashboard, isLoading } = useQuery({
@@ -114,32 +115,35 @@ const DashboardPage = () => {
         </div>
       )}
 
-      {/* Health Score */}
-      {dashboard && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Santé du système</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center space-x-4">
-              <div className="flex-1">
-                <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary transition-all"
-                    style={{ width: `${dashboard.health_score}%` }}
-                  />
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold">{dashboard.health_score}%</p>
-                <p className="text-sm text-muted-foreground">
-                  {dashboard.health_status}
-                </p>
-              </div>
+      {/* Depots Map */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Carte des dépôts - Abidjan
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4 text-sm text-muted-foreground">
+            Visualisation des dépôts et du nombre de palettes disponibles dans chaque dépôt
+          </div>
+          <DepotsMap height="500px" />
+          <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-green-500 border-2 border-white"></div>
+              <span>Stock élevé (&gt;50 palettes)</span>
             </div>
-          </CardContent>
-        </Card>
-      )}
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-yellow-500 border-2 border-white"></div>
+              <span>Stock moyen (30-50 palettes)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-red-500 border-2 border-white"></div>
+              <span>Stock faible (&lt;30 palettes)</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

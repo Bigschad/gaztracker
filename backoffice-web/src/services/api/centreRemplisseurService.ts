@@ -24,6 +24,14 @@ interface NearbyParams {
 }
 
 export const centreRemplisseurService = {
+  // Get next available code
+  getNextCode: async (): Promise<{ code: string }> => {
+    const response = await apiClient.get<{ code: string }>(
+      API_ENDPOINTS.CENTRES_REMPLISSEURS.NEXT_CODE
+    );
+    return response.data;
+  },
+
   // List centres remplisseurs
   list: async (params?: CentreRemplisseurListParams): Promise<CentreRemplisseurList[]> => {
     const response = await apiClient.get<CentreRemplisseurList[]>(

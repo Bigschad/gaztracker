@@ -101,6 +101,7 @@ const DepotsListPage = () => {
                   <tr className="border-b">
                     <th className="px-4 py-3 text-left text-sm font-medium">Nom</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">Code</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Grossiste</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">Ville</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">Principal</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">Statut</th>
@@ -112,6 +113,7 @@ const DepotsListPage = () => {
                     <tr key={depot.id} className="border-b hover:bg-accent/50">
                       <td className="px-4 py-3 font-medium">{depot.name}</td>
                       <td className="px-4 py-3">{depot.code || '-'}</td>
+                      <td className="px-4 py-3 text-sm">{depot.partner_name || '-'}</td>
                       <td className="px-4 py-3 text-sm">{depot.city || '-'}</td>
                       <td className="px-4 py-3">
                         {depot.is_main_depot && <Star className="h-4 w-4 text-yellow-500" />}

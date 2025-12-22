@@ -9,8 +9,9 @@ from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict
 from uuid import UUID
 
-from app.models.palette import PaletteType, PaletteStatus
+from app.models.palette import PaletteType, PaletteStatus, PaletteCondition
 from app.schemas.rfid_tag import RFIDTagResponse
+from app.schemas.centre_remplisseur import CentreRemplisseurRead
 
 
 # =============================================================================
@@ -21,6 +22,7 @@ class PaletteBase(BaseModel):
     """Base palette schema with common fields."""
 
     type: PaletteType = Field(..., description="Type of gas bottles (B6, B12, B28)")
+    condition: Optional[PaletteCondition] = Field(None, description="Condition de la palette (NEUVE ou RECONDITIONNEE)")
     reference_code: Optional[str] = Field(None, max_length=50, description="Code de référence personnalisé")
     capacity: Optional[int] = Field(None, ge=1, description="Capacité en nombre de bouteilles possibles")
     manufacturing_date: Optional[date] = Field(None, description="Date de fabrication")
@@ -36,6 +38,7 @@ class PaletteCreate(PaletteBase):
 
     rfid_tag_id: Optional[UUID] = Field(None, description="ID of the RFID tag to attach (must be NOT_ASSIGNED). Can be added later.")
     current_partner_id: Optional[UUID] = Field(None, description="ID du partenaire (grossiste) chez qui se trouve la palette")
+    current_centre_remplisseur_id: Optional[UUID] = Field(None, description="ID du centre remplisseur où se trouve la palette")
     location_latitude: Optional[float] = Field(None, ge=-90, le=90, description="GPS latitude")
     location_longitude: Optional[float] = Field(None, ge=-180, le=180, description="GPS longitude")
     location_address: Optional[str] = Field(None, max_length=500, description="Physical address")
@@ -57,12 +60,14 @@ class PaletteUpdate(BaseModel):
     """Schema for updating an existing palette."""
 
     type: Optional[PaletteType] = Field(None, description="Type of gas bottles")
+    condition: Optional[PaletteCondition] = Field(None, description="Condition de la palette (NEUVE ou RECONDITIONNEE)")
     reference_code: Optional[str] = Field(None, max_length=50, description="Code de référence personnalisé")
     capacity: Optional[int] = Field(None, ge=1, description="Capacité en nombre de bouteilles possibles")
     manufacturing_date: Optional[date] = Field(None, description="Date de fabrication")
     status: Optional[PaletteStatus] = Field(None, description="Palette status")
     rfid_tag_id: Optional[UUID] = Field(None, description="ID of new RFID tag to assign (must be NOT_ASSIGNED)")
     current_partner_id: Optional[UUID] = Field(None, description="ID du partenaire (grossiste) chez qui se trouve la palette")
+    current_centre_remplisseur_id: Optional[UUID] = Field(None, description="ID du centre remplisseur où se trouve la palette")
     notes: Optional[str] = Field(None, max_length=1000, description="Additional notes")
     location_latitude: Optional[float] = Field(None, ge=-90, le=90, description="GPS latitude")
     location_longitude: Optional[float] = Field(None, ge=-180, le=180, description="GPS longitude")
@@ -128,7 +133,12 @@ class PaletteResponse(PaletteBase):
     rfid_tag_id: Optional[UUID] = Field(None, description="RFID tag ID")
     rfid_tag: Optional[RFIDTagResponse] = Field(None, description="RFID tag details")
     status: PaletteStatus = Field(..., description="Current status")
+    condition: Optional[PaletteCondition] = Field(None, description="Condition de la palette (NEUVE ou RECONDITIONNEE)")
+    is_full: bool = Field(..., description="Whether the palette is full")
     current_partner_id: Optional[UUID] = Field(None, description="Current partner (grossiste) ID")
+    current_centre_remplisseur_id: Optional[UUID] = Field(None, description="Current centre remplisseur ID")
+    current_centre_remplisseur: Optional[CentreRemplisseurRead] = Field(None, description="Current centre remplisseur details")
+    bon_enlevement_actuel_id: Optional[UUID] = Field(None, description="Current bon d'enlèvement ID")
     location_latitude: Optional[float] = Field(None, description="GPS latitude")
     location_longitude: Optional[float] = Field(None, description="GPS longitude")
     location_address: Optional[str] = Field(None, description="Physical address")

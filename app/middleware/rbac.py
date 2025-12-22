@@ -138,11 +138,6 @@ ROLE_PERMISSIONS = {
         "expedition:read",
         "expedition:update",
     ],
-    UserRole.GROSSISTE: [
-        "expedition:read",
-        "expedition:validate",
-        "palette:read",
-    ],
 }
 
 

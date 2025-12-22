@@ -12,7 +12,7 @@ from typing import Optional, Tuple, List
 import logging
 import re
 
-from app.models.palette import Palette, PaletteStatus, PaletteType
+from app.models.palette import Palette, PaletteStatus, PaletteType, PaletteCondition
 from app.models.palette_movement import PaletteMovement, MovementAction
 from app.models.rfid_tag import RFIDTag, RFIDTagStatus
 from app.models.user import User
@@ -35,26 +35,26 @@ class PaletteService:
     def _generate_serial_number(db: Session) -> str:
         """
         Generate a unique serial number for a new palette.
-
+        
         Format: PAL-YYYY-NNNNN where:
         - PAL: Prefix for palette
         - YYYY: Current year
         - NNNNN: Sequential number (5 digits, zero-padded)
-
+        
         Args:
             db: Database session
-
+            
         Returns:
             Generated serial number (e.g., "PAL-2025-00001")
         """
         current_year = datetime.now().year
         prefix = f"PAL-{current_year}-"
-
+        
         # Find the latest serial number for the current year
         latest_palette = db.query(Palette).filter(
             Palette.serial_number.like(f"{prefix}%")
         ).order_by(Palette.serial_number.desc()).first()
-
+        
         if latest_palette and latest_palette.serial_number:
             # Extract the counter from the last serial number
             match = re.search(r'PAL-\d{4}-(\d{5})', latest_palette.serial_number)
@@ -64,12 +64,56 @@ class PaletteService:
                 counter = 1
         else:
             counter = 1
-
+        
         # Generate the new serial number with zero-padding
         serial_number = f"{prefix}{counter:05d}"
-
+        
         return serial_number
 
+    @staticmethod
+    def _generate_reference_code(db: Session) -> str:
+        """
+        Generate a unique reference code for a new palette.
+        
+        Format: REF-YYYY-NNNNN where:
+        - REF: Prefix for reference
+        - YYYY: Current year
+        - NNNNN: Sequential number (5 digits, zero-padded)
+        
+        Args:
+            db: Database session
+            
+        Returns:
+            Generated reference code (e.g., "REF-2025-00001")
+        """
+        current_year = datetime.now().year
+        prefix = f"REF-{current_year}-"
+        
+        # Find the latest reference code for the current year
+        latest_palette = db.query(Palette).filter(
+            Palette.reference_code.like(f"{prefix}%")
+        ).order_by(Palette.reference_code.desc()).first()
+        
+        if latest_palette and latest_palette.reference_code:
+            # Extract the counter from the last reference code
+            match = re.search(r'REF-\d{4}-(\d{5})', latest_palette.reference_code)
+            if match:
+                counter = int(match.group(1)) + 1
+            else:
+                counter = 1
+        else:
+            counter = 1
+        
+        # Generate the new reference code with zero-padding
+        code = f"{prefix}{counter:05d}"
+        
+        # Ensure uniqueness
+        while db.query(Palette).filter(Palette.reference_code == code).first():
+            counter += 1
+            code = f"{prefix}{counter:05d}"
+        
+        return code
+    
     @staticmethod
     def create_palette(
         db: Session,
@@ -78,33 +122,33 @@ class PaletteService:
     ) -> Palette:
         """
         Create a new palette and optionally attach an RFID tag.
-
+        
         Process:
         1. Generate unique serial number
         2. If RFID tag provided: verify it exists and is NOT_ASSIGNED
         3. Create the palette
         4. If RFID tag provided: assign it to the palette
         5. Create initial movement history entry
-
+        
         Args:
             db: Database session
             palette_create: Palette creation data
             current_user: User creating the palette
-
+            
         Returns:
             Created palette
-
+            
         Raises:
             ResourceNotFoundException: If RFID tag not found
             ValidationException: If RFID tag is not assignable
         """
         tag = None
         tag_number = None
-
+        
         # Get and validate RFID tag if provided
         if palette_create.rfid_tag_id:
             tag = RFIDTagService.get_rfid_tag(db, palette_create.rfid_tag_id)
-
+            
             if not tag.is_assignable:
                 raise ValidationException(
                     message=f"RFID tag must be NOT_ASSIGNED and active (current status: {tag.status})",
@@ -116,20 +160,27 @@ class PaletteService:
                     }
                 )
             tag_number = tag.tag_number
-
+            
         # Generate unique serial number
         serial_number = PaletteService._generate_serial_number(db)
-
+        
+        # Generate reference code if not provided
+        reference_code = palette_create.reference_code
+        if not reference_code:
+            reference_code = PaletteService._generate_reference_code(db)
+            
         # Create the palette
         new_palette = Palette(
             serial_number=serial_number,
-            reference_code=palette_create.reference_code,
+            reference_code=reference_code,
             type=palette_create.type,
+            condition=palette_create.condition or PaletteCondition.NEUVE,
             capacity=palette_create.capacity,
             manufacturing_date=palette_create.manufacturing_date,
             status=PaletteStatus.CREATION,
             rfid_tag_id=tag.id if tag else None,
             current_partner_id=palette_create.current_partner_id,
+            current_centre_remplisseur_id=palette_create.current_centre_remplisseur_id,
             location_latitude=palette_create.location_latitude,
             location_longitude=palette_create.location_longitude,
             location_address=palette_create.location_address,
@@ -194,7 +245,8 @@ class PaletteService:
             query = query.options(
                 joinedload(Palette.rfid_tag),
                 joinedload(Palette.created_by),
-                joinedload(Palette.current_partner)
+                joinedload(Palette.current_partner),
+                joinedload(Palette.current_centre_remplisseur)
             )
 
         palette = query.filter(Palette.id == palette_id).first()
@@ -227,7 +279,8 @@ class PaletteService:
         ).options(
             joinedload(Palette.rfid_tag),
             joinedload(Palette.created_by),
-            joinedload(Palette.current_partner)
+            joinedload(Palette.current_partner),
+            joinedload(Palette.current_centre_remplisseur)
         ).first()
 
         if not palette:
@@ -245,6 +298,7 @@ class PaletteService:
         palette_type: Optional[PaletteType] = None,
         status: Optional[PaletteStatus] = None,
         created_by_id: Optional[UUID] = None,
+        current_centre_remplisseur_id: Optional[UUID] = None,
         search: Optional[str] = None,
         page: int = 1,
         page_size: int = 20
@@ -267,7 +321,8 @@ class PaletteService:
         query = db.query(Palette).options(
             joinedload(Palette.rfid_tag),
             joinedload(Palette.created_by),
-            joinedload(Palette.current_partner)
+            joinedload(Palette.current_partner),
+            joinedload(Palette.current_centre_remplisseur)
         )
 
         # Apply filters
@@ -277,6 +332,8 @@ class PaletteService:
             query = query.filter(Palette.status == status)
         if created_by_id:
             query = query.filter(Palette.created_by_id == created_by_id)
+        if current_centre_remplisseur_id:
+            query = query.filter(Palette.current_centre_remplisseur_id == current_centre_remplisseur_id)
         if search:
             query = query.join(RFIDTag).filter(
                 or_(

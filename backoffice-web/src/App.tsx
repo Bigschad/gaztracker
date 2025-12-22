@@ -9,6 +9,7 @@ import DashboardPage from './pages/dashboard/DashboardPage';
 import PalettesListPage from './pages/palettes/PalettesListPage';
 import PaletteDetailsPage from './pages/palettes/PaletteDetailsPage';
 import CreatePalettePage from './pages/palettes/CreatePalettePage';
+import EditPalettePage from './pages/palettes/EditPalettePage';
 // Expeditions removed - replaced by Bons d'Enlèvement and Bons de Réception Retour
 import RFIDTagsListPage from './pages/rfidTags/RFIDTagsListPage';
 import UsersListPage from './pages/users/UsersListPage';
@@ -22,6 +23,10 @@ import ContactsListPage from './pages/contacts/ContactsListPage';
 import CreateContactPage from './pages/contacts/CreateContactPage';
 import EditContactPage from './pages/contacts/EditContactPage';
 import ContactDetailsPage from './pages/contacts/ContactDetailsPage';
+import DistributeursListPage from './pages/distributeurs/DistributeursListPage';
+import DistributeurDetailsPage from './pages/distributeurs/DistributeurDetailsPage';
+import CreateDistributeurPage from './pages/distributeurs/CreateDistributeurPage';
+import EditDistributeurPage from './pages/distributeurs/EditDistributeurPage';
 import GroupesListPage from './pages/groupes/GroupesListPage';
 import GroupeDetailsPage from './pages/groupes/GroupeDetailsPage';
 import CreateGroupePage from './pages/groupes/CreateGroupePage';
@@ -29,6 +34,7 @@ import EditGroupePage from './pages/groupes/EditGroupePage';
 import CentresRemplisseursListPage from './pages/centresRemplisseurs/CentresRemplisseursListPage';
 import CentreRemplisseurDetailsPage from './pages/centresRemplisseurs/CentreRemplisseurDetailsPage';
 import CreateCentreRemplisseurPage from './pages/centresRemplisseurs/CreateCentreRemplisseurPage';
+import EditCentreRemplisseurPage from './pages/centresRemplisseurs/EditCentreRemplisseurPage';
 import DepotsListPage from './pages/depots/DepotsListPage';
 import DepotDetailsPage from './pages/depots/DepotDetailsPage';
 import CreateDepotPage from './pages/depots/CreateDepotPage';
@@ -36,6 +42,7 @@ import BonsEnlevementHomePage from './pages/bonsEnlevement/BonsEnlevementHomePag
 import BonsEnlevementListPage from './pages/bonsEnlevement/BonsEnlevementListPage';
 import BonEnlevementDetailsPage from './pages/bonsEnlevement/BonEnlevementDetailsPage';
 import CreateBonEnlevementPage from './pages/bonsEnlevement/CreateBonEnlevementPage';
+import EditBonEnlevementPage from './pages/bonsEnlevement/EditBonEnlevementPage';
 import BonsReceptionRetourHomePage from './pages/bonsReceptionRetour/BonsReceptionRetourHomePage';
 import BonsReceptionRetourListPage from './pages/bonsReceptionRetour/BonsReceptionRetourListPage';
 import BonReceptionRetourDetailsPage from './pages/bonsReceptionRetour/BonReceptionRetourDetailsPage';
@@ -69,6 +76,7 @@ function App() {
             <Route path="palettes" element={<PalettesListPage />} />
             <Route path="palettes/new" element={<CreatePalettePage />} />
             <Route path="palettes/:id" element={<PaletteDetailsPage />} />
+            <Route path="palettes/:id/edit" element={<EditPalettePage />} />
 
             {/* RFID Tags */}
             <Route path="rfid-tags" element={<RFIDTagsListPage />} />
@@ -94,6 +102,12 @@ function App() {
             <Route path="contacts/:id" element={<ContactDetailsPage />} />
             <Route path="contacts/:id/edit" element={<EditContactPage />} />
 
+            {/* Distributeurs */}
+            <Route path="distributeurs" element={<DistributeursListPage />} />
+            <Route path="distributeurs/new" element={<CreateDistributeurPage />} />
+            <Route path="distributeurs/:id" element={<DistributeurDetailsPage />} />
+            <Route path="distributeurs/:id/edit" element={<EditDistributeurPage />} />
+
             {/* Groupes */}
             <Route path="groupes" element={<GroupesListPage />} />
             <Route path="groupes/new" element={<CreateGroupePage />} />
@@ -104,6 +118,7 @@ function App() {
             <Route path="centres-remplisseurs" element={<CentresRemplisseursListPage />} />
             <Route path="centres-remplisseurs/new" element={<CreateCentreRemplisseurPage />} />
             <Route path="centres-remplisseurs/:id" element={<CentreRemplisseurDetailsPage />} />
+            <Route path="centres-remplisseurs/:id/edit" element={<EditCentreRemplisseurPage />} />
 
             {/* Dépôts */}
             <Route path="depots" element={<DepotsListPage />} />
@@ -115,6 +130,7 @@ function App() {
             <Route path="bons-enlevement/list" element={<BonsEnlevementListPage />} />
             <Route path="bons-enlevement/new" element={<CreateBonEnlevementPage />} />
             <Route path="bons-enlevement/:id" element={<BonEnlevementDetailsPage />} />
+            <Route path="bons-enlevement/:id/edit" element={<EditBonEnlevementPage />} />
 
             {/* Bons de Réception Retour */}
             <Route path="bons-reception-retour" element={<BonsReceptionRetourHomePage />} />

@@ -6,3 +6,5 @@ export { Dialog } from './Dialog';
 export { ConfirmDialog } from './ConfirmDialog';
 export { ProtectedRoute } from './ProtectedRoute';
 export { Tabs } from './Tabs';
+export { default as Toast } from './Toast';
+export { ImageUpload } from './ImageUpload';

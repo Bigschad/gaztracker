@@ -27,6 +27,14 @@ interface NearbyParams {
 }
 
 export const depotService = {
+  // Get next available code
+  getNextCode: async (): Promise<{ code: string }> => {
+    const response = await apiClient.get<{ code: string }>(
+      API_ENDPOINTS.DEPOTS.NEXT_CODE
+    );
+    return response.data;
+  },
+
   // List depots
   list: async (params?: DepotListParams): Promise<DepotList[]> => {
     const response = await apiClient.get<DepotList[]>(

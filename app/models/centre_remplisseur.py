@@ -29,15 +29,10 @@ class CentreRemplisseur(Base, TimestampMixin):
         city: City
         postal_code: Postal code
         country: Country
-        latitude: GPS latitude
-        longitude: GPS longitude
         phone: Phone number
         email: Email address
         contact_name: Contact person name
         contact_phone: Contact person phone
-        capacity_b28: Capacity for B28 palettes
-        capacity_b12: Capacity for B12 palettes
-        capacity_b6: Capacity for B6 palettes
         is_active: Whether the centre is active
         notes: Additional notes
         created_at: Timestamp when created
@@ -81,6 +76,14 @@ class CentreRemplisseur(Base, TimestampMixin):
         comment="FK to partners (distributeur)"
     )
     
+    grand_distributeur_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("grand_distributeurs.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        comment="FK to grand_distributeurs"
+    )
+    
     # Address Information
     address = Column(
         String(500),
@@ -105,19 +108,6 @@ class CentreRemplisseur(Base, TimestampMixin):
         nullable=True,
         default="Côte d'Ivoire",
         comment="Country"
-    )
-    
-    # GPS Coordinates
-    latitude = Column(
-        Float,
-        nullable=True,
-        comment="GPS latitude"
-    )
-    
-    longitude = Column(
-        Float,
-        nullable=True,
-        comment="GPS longitude"
     )
     
     # Contact Information
@@ -147,25 +137,6 @@ class CentreRemplisseur(Base, TimestampMixin):
         comment="Contact person phone"
     )
     
-    # Capacity
-    capacity_b28 = Column(
-        Integer,
-        nullable=True,
-        comment="Capacity for B28 palettes"
-    )
-    
-    capacity_b12 = Column(
-        Integer,
-        nullable=True,
-        comment="Capacity for B12 palettes"
-    )
-    
-    capacity_b6 = Column(
-        Integer,
-        nullable=True,
-        comment="Capacity for B6 palettes"
-    )
-    
     # Status
     is_active = Column(
         Boolean,
@@ -186,6 +157,12 @@ class CentreRemplisseur(Base, TimestampMixin):
     partner = relationship(
         "Partner",
         foreign_keys=[partner_id]
+    )
+    
+    grand_distributeur = relationship(
+        "GrandDistributeur",
+        back_populates="centres_remplisseurs",
+        foreign_keys=[grand_distributeur_id]
     )
     
     bons_enlevement = relationship(
@@ -213,7 +190,7 @@ class CentreRemplisseur(Base, TimestampMixin):
     __table_args__ = (
         Index("ix_centres_name_active", "name", "is_active"),
         Index("ix_centres_partner", "partner_id", "is_active"),
-        Index("ix_centres_location", "latitude", "longitude"),
+        Index("ix_centres_grand_dist", "grand_distributeur_id", "is_active"),
     )
     
     def __repr__(self) -> str:
@@ -225,14 +202,4 @@ class CentreRemplisseur(Base, TimestampMixin):
         """Get full address as a string."""
         parts = [self.address, self.city, self.postal_code, self.country]
         return ", ".join(filter(None, parts))
-    
-    @property
-    def has_location(self) -> bool:
-        """Check if centre has GPS coordinates."""
-        return self.latitude is not None and self.longitude is not None
-    
-    @property
-    def total_capacity(self) -> int:
-        """Get total capacity across all palette types."""
-        return (self.capacity_b28 or 0) + (self.capacity_b12 or 0) + (self.capacity_b6 or 0)
 

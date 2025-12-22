@@ -43,4 +43,12 @@ export const userService = {
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/api/v1/users/${id}`);
   },
+
+  // Reset password (admin only)
+  resetPassword: async (id: string, newPassword: string): Promise<void> => {
+    await apiClient.put(
+      API_ENDPOINTS.USERS.RESET_PASSWORD(id),
+      { new_password: newPassword }
+    );
+  },
 };

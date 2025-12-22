@@ -73,35 +73,69 @@ app = FastAPI(
 # =============================================================================
 
 # CORS Middleware
-# En développement, autoriser toutes les origines pour faciliter les tests
-cors_origins = settings.ALLOWED_ORIGINS
+cors_origins = []
+
+# 1. Start with configured ALLOWED_ORIGINS from settings (env vars)
+if settings.ALLOWED_ORIGINS:
+    if isinstance(settings.ALLOWED_ORIGINS, str):
+        cors_origins.extend([origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip()])
+    else:
+        cors_origins.extend(settings.ALLOWED_ORIGINS)
+
+# 2. Add environment-specific origins
 if settings.is_development:
-    # En développement, autoriser localhost sur tous les ports
-    cors_origins = [
+    # Local development origins
+    logger.info("Configuring CORS for DEVELOPMENT/LOCAL environment")
+    dev_origins = [
+        "http://localhost",
+        "http://localhost:80",
         "http://localhost:3000",
         "http://localhost:3001",
+        "http://localhost:5173",  # Vite default
+        "http://localhost:8000",
         "http://localhost:8080",
+        "http://localhost:8081",  # Redis Commander
         "http://localhost:8082",
+        "http://127.0.0.1",
         "http://127.0.0.1:3000",
-        "http://127.0.0.1:3001",
+        "http://127.0.0.1:8000",
         "http://127.0.0.1:8080",
-        "http://127.0.0.1:8082",
     ]
-else:
-    # En production, ajouter l'IP du serveur si elle n'est pas déjà dans ALLOWED_ORIGINS
-    # Cela permet d'accéder depuis l'IP publique du serveur
+    cors_origins.extend(dev_origins)
+
+elif settings.is_staging:
+    # Staging / Recette environment
+    logger.info("Configuring CORS for STAGING/RECETTE environment")
+    # Add typical staging IPs or domains if known, otherwise rely on ALLOWED_ORIGINS
+    # We can add the known IP 15.237.112.22 here as a fallback/default for staging
+    staging_origins = [
+        "http://15.237.112.22",
+        "http://15.237.112.22:80",
+        "http://15.237.112.22:3000",
+        "http://15.237.112.22:8080",
+    ]
+    cors_origins.extend(staging_origins)
+
+elif settings.is_production:
+    # Production environment
+    logger.info("Configuring CORS for PRODUCTION environment")
+    # In production, we should be strict.
+    # We rely primarily on ALLOWED_ORIGINS env var, but we can check for SERVER_IP
     import os
     server_ip = os.getenv('SERVER_IP') or os.getenv('LIGHTSAIL_HOST')
     if server_ip:
-        server_origins = [
+        prod_origins = [
             f"http://{server_ip}",
-            f"http://{server_ip}:3000",
+            f"https://{server_ip}",
             f"http://{server_ip}:80",
+            f"https://{server_ip}:443",
         ]
-        # Ajouter les origines du serveur si elles ne sont pas déjà présentes
-        for origin in server_origins:
-            if origin not in cors_origins:
-                cors_origins.append(origin)
+        cors_origins.extend(prod_origins)
+
+# Remove duplicates
+cors_origins = list(set(cors_origins))
+
+logger.info(f"Active CORS origins: {cors_origins}")
 
 app.add_middleware(
     CORSMiddleware,

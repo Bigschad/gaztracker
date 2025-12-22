@@ -6,10 +6,13 @@ import { Card, CardHeader, CardTitle, CardContent, Button, Input } from '../../c
 import { groupeService, uploadService } from '../../services/api';
 import { GroupeCreate } from '../../types';
 import { ArrowLeft, Upload, X } from 'lucide-react';
+import { useToast } from '../../hooks/useToast';
+import { getErrorDetails } from '../../utils/errorMessages';
 
 const CreateGroupePage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { showToast, ToastContainer } = useToast();
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -24,11 +27,25 @@ const CreateGroupePage = () => {
     mutationFn: groupeService.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['groupes'] });
-      alert('Groupe créé avec succès');
+      showToast({
+        type: 'success',
+        title: 'Succès',
+        message: 'Groupe créé avec succès',
+        duration: 3000,
+      });
+      setTimeout(() => {
       navigate('/groupes');
+        window.location.reload();
+      }, 500);
     },
     onError: (error: any) => {
-      alert(error.response?.data?.detail || 'Erreur lors de la création');
+      const errorDetails = getErrorDetails(error);
+      showToast({
+        type: 'error',
+        title: errorDetails.title,
+        message: errorDetails.message,
+        duration: 7000,
+      });
     },
   });
 
@@ -84,6 +101,7 @@ const CreateGroupePage = () => {
 
   return (
     <div className="space-y-6">
+      <ToastContainer />
       <div className="flex items-center gap-4">
         <Link to="/groupes">
           <Button variant="secondary">

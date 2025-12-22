@@ -75,6 +75,13 @@ try {
   console.error('[App] ❌ Error importing RFIDTagsListScreen:', error);
 }
 
+let VehiclesListScreen: any;
+try {
+  VehiclesListScreen = require('./src/screens/VehiclesListScreen').VehiclesListScreen;
+} catch (error) {
+  console.error('[App] ❌ Error importing VehiclesListScreen:', error);
+}
+
 const Stack = createStackNavigator();
 
 const PersistGateLoading = () => (
@@ -212,6 +219,13 @@ const AppNavigator = () => {
           name="RFIDTagsList" 
           component={RFIDTagsListScreen}
           options={{ title: 'Liste des tags RFID' }}
+        />
+      )}
+      {VehiclesListScreen && (
+        <Stack.Screen 
+          name="VehiclesList" 
+          component={VehiclesListScreen}
+          options={{ title: 'Mes véhicules' }}
         />
       )}
       <Stack.Screen 

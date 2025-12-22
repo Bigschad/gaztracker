@@ -40,7 +40,7 @@ class GrandDistributeurService:
         ).scalar_one_or_none()
         
         if not groupe:
-            raise NotFoundException(f"Groupe with ID {schema.groupe_id} not found")
+            raise NotFoundException("Groupe", schema.groupe_id)
         
         # Check for duplicate code
         existing = db.execute(
@@ -48,7 +48,7 @@ class GrandDistributeurService:
         ).scalar_one_or_none()
         
         if existing:
-            raise DuplicateException(f"GrandDistributeur with code '{schema.code}' already exists")
+            raise DuplicateException("GrandDistributeur", "code", schema.code)
         
         # Check for duplicate email if provided
         if schema.email:
@@ -57,7 +57,7 @@ class GrandDistributeurService:
             ).scalar_one_or_none()
             
             if existing_email:
-                raise DuplicateException(f"GrandDistributeur with email '{schema.email}' already exists")
+                raise DuplicateException("GrandDistributeur", "email", schema.email)
         
         # Create new GrandDistributeur
         grand_distributeur = GrandDistributeur(**schema.model_dump())
@@ -87,7 +87,7 @@ class GrandDistributeurService:
         ).scalar_one_or_none()
         
         if not grand_distributeur:
-            raise NotFoundException(f"GrandDistributeur with ID {grand_distributeur_id} not found")
+            raise NotFoundException("GrandDistributeur", grand_distributeur_id)
         
         return grand_distributeur
     
@@ -221,7 +221,7 @@ class GrandDistributeurService:
             ).scalar_one_or_none()
             
             if existing:
-                raise DuplicateException(f"GrandDistributeur with code '{schema.code}' already exists")
+                raise DuplicateException("GrandDistributeur", "code", schema.code)
         
         # Check for duplicate email if being updated
         if schema.email and schema.email != grand_distributeur.email:
@@ -233,7 +233,7 @@ class GrandDistributeurService:
             ).scalar_one_or_none()
             
             if existing_email:
-                raise DuplicateException(f"GrandDistributeur with email '{schema.email}' already exists")
+                raise DuplicateException("GrandDistributeur", "email", schema.email)
         
         # Update attributes
         update_data = schema.model_dump(exclude_unset=True)

@@ -19,11 +19,13 @@ class PartnerType(str, enum.Enum):
     Partner types.
     
     - GROSSISTE: Wholesaler/distributor
+    - DISTRIBUTEUR: Distributor
     - REVENDEUR: Reseller (client of grossiste)
     - TRANSPORTEUR: Transport company
     - AUTRE: Other
     """
     GROSSISTE = "GROSSISTE"
+    DISTRIBUTEUR = "DISTRIBUTEUR"
     REVENDEUR = "REVENDEUR"
     TRANSPORTEUR = "TRANSPORTEUR"
     AUTRE = "AUTRE"
@@ -96,6 +98,15 @@ class Partner(Base, TimestampMixin):
         nullable=True,
         index=True,
         comment="FK to parent grossiste (for REVENDEUR only)"
+    )
+    
+    # For DISTRIBUTEUR: link to groupe
+    groupe_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("groupes.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="FK to groupe (for DISTRIBUTEUR only)"
     )
     
     # Address Information
@@ -236,6 +247,12 @@ class Partner(Base, TimestampMixin):
         back_populates="current_partner",
         foreign_keys="Palette.current_partner_id",
         lazy="dynamic"
+    )
+    
+    groupe = relationship(
+        "Groupe",
+        foreign_keys=[groupe_id],
+        lazy="select"
     )
     
     # Indexes

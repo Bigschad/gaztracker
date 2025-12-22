@@ -416,7 +416,17 @@ def get_sync_db() -> Generator[Session, None, None]:
         session.commit()
     except Exception as e:
         session.rollback()
-        logger.error(f"Database session error: {e}")
+        error_str = str(e)
+        # Handle FOURNISSEUR enum error - log helpful message
+        if "'FOURNISSEUR' is not among the defined enum values" in error_str or "FOURNISSEUR" in error_str:
+            logger.error(
+                f"Database session error: {e}\n"
+                "This error indicates there are still FOURNISSEUR records in the database.\n"
+                "Please run the migration: alembic upgrade head\n"
+                "Or run the fix script: python scripts/fix_fournisseur_records.py"
+            )
+        else:
+            logger.error(f"Database session error: {e}")
         raise
     finally:
         session.close()

@@ -10,6 +10,7 @@ import {
 
 interface PartnerListParams extends PaginationParams {
   type?: string;
+  groupe_id?: string; // UUID
   is_active?: boolean;
   search?: string;
 }

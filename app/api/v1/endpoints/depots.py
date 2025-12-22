@@ -20,9 +20,23 @@ from app.schemas.depot import (
     DepotLocation
 )
 from app.core.exceptions import NotFoundException, DuplicateException, ValidationException
+from app.models.partner import Partner
+from sqlalchemy import select
 
 
 router = APIRouter()
+
+
+@router.get("/next-code", response_model=dict)
+def get_next_code(db: Session = Depends(get_sync_db)):
+    """
+    Get the next available depot code.
+    
+    Returns:
+        Dictionary with the next code
+    """
+    code = DepotService._generate_code(db)
+    return {"code": code}
 
 
 @router.post("/", response_model=DepotRead, status_code=status.HTTP_201_CREATED)
@@ -37,8 +51,6 @@ def create_depot(
     - **code**: Unique code (optional)
     - **partner_id**: ID of the partner (grossiste or revendeur)
     - **address**, **city**: Location
-    - **latitude**, **longitude**: GPS coordinates (optional)
-    - **capacity_b28**, **capacity_b12**, **capacity_b6**: Capacities per type
     - **is_main_depot**: Whether this is the main depot for the partner
     """
     try:
@@ -82,7 +94,32 @@ def list_depots(
         city=city,
         search=search
     )
-    return depots
+    
+    # Get partner IDs and fetch partners in bulk
+    partner_ids = {depot.partner_id for depot in depots}
+    partners = {}
+    if partner_ids:
+        partner_results = db.execute(
+            select(Partner).where(Partner.id.in_(partner_ids))
+        )
+        for partner in partner_results.scalars().all():
+            partners[partner.id] = partner.name
+    
+    # Build DepotList objects with partner names
+    depot_list = []
+    for depot in depots:
+        depot_list.append(DepotList(
+            id=depot.id,
+            name=depot.name,
+            code=depot.code,
+            partner_id=depot.partner_id,
+            partner_name=partners.get(depot.partner_id),
+            city=depot.city,
+            is_active=depot.is_active,
+            is_main_depot=depot.is_main_depot
+        ))
+    
+    return depot_list
 
 
 @router.get("/locations", response_model=List[DepotLocation])
@@ -96,39 +133,16 @@ def get_depot_locations(
     Returns only depots with GPS coordinates.
     """
     depots = DepotService.get_all(db, is_active=is_active, limit=1000)
-    # Filter only depots with coordinates
     locations = [
         DepotLocation(
             id=d.id,
             name=d.name,
-            latitude=d.latitude,
-            longitude=d.longitude,
             address=d.address,
             city=d.city
         )
-        for d in depots if d.latitude and d.longitude
+        for d in depots
     ]
     return locations
-
-
-@router.get("/nearby")
-def get_nearby_depots(
-    latitude: float = Query(..., ge=-90, le=90),
-    longitude: float = Query(..., ge=-180, le=180),
-    radius_km: float = Query(10.0, ge=0.1, le=100),
-    is_active: bool = True,
-    db: Session = Depends(get_sync_db)
-):
-    """
-    Get depots near a GPS location.
-    
-    - **latitude**: Search latitude
-    - **longitude**: Search longitude
-    - **radius_km**: Search radius in kilometers
-    - **is_active**: Filter by active status
-    """
-    depots = DepotService.get_by_location(db, latitude, longitude, radius_km, is_active)
-    return depots
 
 
 @router.get("/{depot_id}", response_model=DepotDetail)
@@ -150,13 +164,8 @@ def get_depot(
                 "address": depot.address,
                 "city": depot.city,
                 "postal_code": depot.postal_code,
-                "latitude": depot.latitude,
-                "longitude": depot.longitude,
                 "contact_name": depot.contact_name,
                 "contact_phone": depot.contact_phone,
-                "capacity_b28": depot.capacity_b28,
-                "capacity_b12": depot.capacity_b12,
-                "capacity_b6": depot.capacity_b6,
                 "is_active": depot.is_active,
                 "is_main_depot": depot.is_main_depot,
                 "notes": depot.notes,
@@ -164,7 +173,6 @@ def get_depot(
                 "updated_at": depot.updated_at,
                 "partner_name": stats["partner_name"],
                 "partner_type": stats["partner_type"],
-                "total_capacity": stats["total_capacity"],
                 "palettes_count": stats["palettes_count"]
             }
         )

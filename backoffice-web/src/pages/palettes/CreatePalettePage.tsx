@@ -1,14 +1,28 @@
 import { useNavigate, Link } from 'react-router-dom';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
+import { useEffect, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { paletteService, rfidTagService, partnerService } from '../../services/api';
+import { paletteService, rfidTagService, centreRemplisseurService } from '../../services/api';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from '../../components/common';
 import { ArrowLeft } from 'lucide-react';
 import { paletteCreateSchema, PaletteCreateFormData } from '../../utils/validators';
+import { useAuth } from '../../hooks/useAuth';
+import { UserRole } from '../../types/user';
 
 const CreatePalettePage = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  // Fetch next available code - enabled immediately when component mounts
+  const { data: nextCodeData, isLoading: isLoadingCode } = useQuery({
+    queryKey: ['palettes', 'next-code'],
+    queryFn: () => paletteService.getNextCode(),
+    enabled: true, // Always fetch on mount
+  });
+
+  const nextCode = nextCodeData?.code || '';
 
   // Fetch available RFID tags (NOT_ASSIGNED and active)
   const { data: rfidTagsData } = useQuery({
@@ -21,20 +35,54 @@ const CreatePalettePage = () => {
     }),
   });
 
-  // Fetch partners (grossistes)
-  const { data: partnersData } = useQuery({
-    queryKey: ['partners', 'grossistes'],
-    queryFn: () => partnerService.list({
-      type: 'GROSSISTE' as any,
-      is_active: true,
-      page: 1,
-      page_size: 100,
-    }),
+  // Fetch centres remplisseurs
+  const { data: centres } = useQuery({
+    queryKey: ['centres-remplisseurs', 'palette-form'],
+    queryFn: () => centreRemplisseurService.list({ limit: 100, is_active: true }),
+    enabled: true,
   });
 
-  const { register, handleSubmit, control, formState: { errors } } = useForm<PaletteCreateFormData>({
+  // Determine default centre remplisseur based on user's company
+  const defaultCentreId = useMemo(() => {
+    if (!user?.company_name || !centres) return '';
+    
+    // For OPERATEUR_USINE and RESPONSABLE_LOGISTIQUE: look for matching centre
+    if (user.role === UserRole.OPERATEUR_USINE || user.role === UserRole.RESPONSABLE_LOGISTIQUE) {
+      const matchingCentre = centres.find(c => c.id === user.company_name);
+      if (matchingCentre) return matchingCentre.id;
+    }
+    
+    // For ADMIN: if company_name is a centre ID, use it
+    const matchingCentre = centres.find(c => c.id === user.company_name);
+    if (matchingCentre) return matchingCentre.id;
+    
+    return '';
+  }, [user, centres]);
+
+  const { register, handleSubmit, control, formState: { errors }, setValue, watch } = useForm<PaletteCreateFormData>({
     resolver: zodResolver(paletteCreateSchema),
+    defaultValues: {
+      reference_code: '', // Will be set when code is loaded
+      current_centre_remplisseur_id: defaultCentreId || undefined,
+    },
   });
+
+  // Set the auto-generated code when it's loaded
+  useEffect(() => {
+    if (nextCode) {
+      setValue('reference_code', nextCode, { shouldValidate: false });
+    }
+  }, [nextCode, setValue]);
+
+  // Set default centre remplisseur when data is loaded and user is available
+  useEffect(() => {
+    if (defaultCentreId) {
+      const currentValue = watch('current_centre_remplisseur_id');
+      if (!currentValue) {
+        setValue('current_centre_remplisseur_id', defaultCentreId, { shouldValidate: false });
+      }
+    }
+  }, [defaultCentreId, setValue, watch]);
 
   const createMutation = useMutation({
     mutationFn: (data: PaletteCreateFormData) => {
@@ -42,28 +90,47 @@ const CreatePalettePage = () => {
       const payload: any = {
         type: data.palette_type,
       };
+      
+      // Include condition if provided
+      if (data.condition) {
+        payload.condition = data.condition;
+      }
+      
+      // Only include fields that have actual values (not empty strings)
       if (data.reference_code && data.reference_code.trim()) {
         payload.reference_code = data.reference_code.trim();
       }
-      if (data.capacity) {
+      if (data.capacity && data.capacity > 0) {
         payload.capacity = data.capacity;
       }
       if (data.manufacturing_date && data.manufacturing_date.trim()) {
         payload.manufacturing_date = data.manufacturing_date.trim();
       }
-      if (data.rfid_tag_id && data.rfid_tag_id.trim()) {
+      if (data.rfid_tag_id && data.rfid_tag_id.trim() && data.rfid_tag_id.trim() !== '') {
         payload.rfid_tag_id = data.rfid_tag_id.trim();
       }
-      if (data.current_partner_id && data.current_partner_id.trim()) {
+      // Handle centre remplisseur selection - required field
+      if (data.current_centre_remplisseur_id && data.current_centre_remplisseur_id.trim() && data.current_centre_remplisseur_id.trim() !== '') {
+        payload.current_centre_remplisseur_id = data.current_centre_remplisseur_id.trim();
+      }
+      // Handle partner selection (optional)
+      if (data.current_partner_id && data.current_partner_id.trim() && data.current_partner_id.trim() !== '') {
         payload.current_partner_id = data.current_partner_id.trim();
       }
       if (data.notes && data.notes.trim()) {
         payload.notes = data.notes.trim();
       }
+      
       return paletteService.create(payload);
     },
     onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['palettes'] });
       navigate(`/palettes/${data.id}`);
+    },
+    onError: (error: any) => {
+      console.error('Error creating palette:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Erreur lors de la création de la palette';
+      alert(errorMessage);
     },
   });
 
@@ -72,17 +139,16 @@ const CreatePalettePage = () => {
   };
 
   const availableTags = rfidTagsData?.items || [];
-  const grossistes = partnersData?.items || [];
 
-  // Debug logs
-  if (rfidTagsData) {
-    console.log('RFID Tags Response:', rfidTagsData);
-    console.log('Available Tags:', availableTags);
-  }
-  if (partnersData) {
-    console.log('Partners Response:', partnersData);
-    console.log('Grossistes:', grossistes);
-  }
+  // Build list of centres remplisseurs
+  const centreOptions = useMemo(() => {
+    if (!centres) return [];
+    
+    return centres.map(centre => ({
+      value: centre.id,
+      label: `${centre.name} (${centre.code})`,
+    })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [centres]);
 
   return (
     <div className="w-full">
@@ -107,11 +173,23 @@ const CreatePalettePage = () => {
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium mb-1">Identifiant palette (code de référence)</label>
-                  <Input
-                    error={errors.reference_code?.message}
-                    {...register('reference_code')}
-                    placeholder="Code de référence"
+                  <Controller
+                    name="reference_code"
+                    control={control}
+                    render={({ field }) => (
+                      <Input
+                        {...field}
+                        value={nextCode || field.value || ''}
+                        disabled
+                        error={errors.reference_code?.message}
+                        className="bg-gray-100 text-gray-700 cursor-not-allowed opacity-75"
+                        placeholder={isLoadingCode ? "Génération en cours..." : "Génération automatique..."}
+                      />
+                    )}
                   />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {isLoadingCode ? "Génération du code en cours..." : "Code généré automatiquement"}
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Type de palette</label>
@@ -129,8 +207,22 @@ const CreatePalettePage = () => {
                 </div>
               </div>
 
-              {/* Deuxième ligne : Capacité (à gauche) et Date de fabrication (à droite) */}
+              {/* Deuxième ligne : Condition (à gauche) et Capacité (à droite) */}
               <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Condition</label>
+                  <select
+                    {...register('condition')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    defaultValue="NEUVE"
+                  >
+                    <option value="NEUVE">Neuve</option>
+                    <option value="RECONDITIONNEE">Reconditionnée</option>
+                  </select>
+                  {errors.condition && (
+                    <p className="mt-1 text-sm text-destructive">{errors.condition.message}</p>
+                  )}
+                </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Capacité (Nombre de bouteilles possible)</label>
                   <Input
@@ -140,17 +232,19 @@ const CreatePalettePage = () => {
                     placeholder="Capacité"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Date de fabrication</label>
-                  <Input
-                    type="date"
-                    error={errors.manufacturing_date?.message}
-                    {...register('manufacturing_date')}
-                  />
-                </div>
               </div>
 
-              {/* Troisième ligne : Tag RFID (à gauche) et Localisation (à droite) */}
+              {/* Troisième ligne : Date de fabrication */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Date de fabrication</label>
+                <Input
+                  type="date"
+                  error={errors.manufacturing_date?.message}
+                  {...register('manufacturing_date')}
+                />
+              </div>
+
+              {/* Quatrième ligne : Tag RFID (à gauche) et Localisation (à droite) */}
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium mb-1">Tag RFID</label>
@@ -178,10 +272,11 @@ const CreatePalettePage = () => {
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Localisation (Liste des grossistes)</label>
+                  <label className="block text-sm font-medium mb-1">Localisation (Centres de Remplissage)</label>
                   <Controller
-                    name="current_partner_id"
+                    name="current_centre_remplisseur_id"
                     control={control}
+                    defaultValue={defaultCentreId || undefined}
                     render={({ field }) => (
                       <select
                         {...field}
@@ -189,17 +284,22 @@ const CreatePalettePage = () => {
                         onChange={(e) => field.onChange(e.target.value === '' ? undefined : e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
-                        <option value="">Aucun grossiste</option>
-                        {grossistes.map((partner) => (
-                          <option key={partner.id} value={partner.id}>
-                            {partner.name}
+                        <option value="">Sélectionner un centre de remplissage</option>
+                        {centreOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
                           </option>
                         ))}
                       </select>
                     )}
                   />
-                  {errors.current_partner_id && (
-                    <p className="mt-1 text-sm text-destructive">{errors.current_partner_id.message}</p>
+                  {errors.current_centre_remplisseur_id && (
+                    <p className="mt-1 text-sm text-destructive">{errors.current_centre_remplisseur_id.message}</p>
+                  )}
+                  {defaultCentreId && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Par défaut : centre de remplissage de l'utilisateur connecté
+                    </p>
                   )}
                 </div>
               </div>

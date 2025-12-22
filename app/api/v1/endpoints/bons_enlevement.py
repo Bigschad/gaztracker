@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 
 from app.database import get_sync_db
 from app.models.bon_enlevement import BonEnlevementStatus
+from app.models.user import User
+from app.middleware.auth_middleware import get_current_user_sync
 from app.services.bon_enlevement_service import BonEnlevementService
 from app.schemas.bon_enlevement import (
     BonEnlevementCreate,
@@ -33,7 +35,8 @@ router = APIRouter()
 @router.post("/", response_model=BonEnlevementRead, status_code=status.HTTP_201_CREATED)
 def create_bon(
     schema: BonEnlevementCreate,
-    db: Session = Depends(get_sync_db)
+    db: Session = Depends(get_sync_db),
+    current_user: User = Depends(get_current_user_sync)
 ):
     """
     Create a new Bon d'Enlèvement.
@@ -46,10 +49,7 @@ def create_bon(
     - **vehicule_immatriculation**, **chauffeur_nom**, **chauffeur_societe**: Transport details
     """
     try:
-        # TODO: Get created_by_id from authenticated user
-        created_by_id = UUID("00000000-0000-0000-0000-000000000001")  # Placeholder
-        
-        bon = BonEnlevementService.create(db, schema, created_by_id)
+        bon = BonEnlevementService.create(db, schema, current_user.id)
         return bon
     except NotFoundException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -184,7 +184,8 @@ def valider_bon(
 def start_chargement(
     bon_id: UUID,
     chargement: BonEnlevementChargement,
-    db: Session = Depends(get_sync_db)
+    db: Session = Depends(get_sync_db),
+    current_user: User = Depends(get_current_user_sync)
 ):
     """
     Start loading palettes (VALIDE → EN_CHARGEMENT).
@@ -195,10 +196,7 @@ def start_chargement(
     - Transition: VALIDE → EN_CHARGEMENT
     """
     try:
-        # TODO: Get user_id from authenticated user
-        user_id = UUID("00000000-0000-0000-0000-000000000001")
-        
-        bon = BonEnlevementService.start_chargement(db, bon_id, chargement, user_id)
+        bon = BonEnlevementService.start_chargement(db, bon_id, chargement, current_user.id)
         return bon
     except NotFoundException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -210,7 +208,8 @@ def start_chargement(
 def depart(
     bon_id: UUID,
     depart: BonEnlevementDepart,
-    db: Session = Depends(get_sync_db)
+    db: Session = Depends(get_sync_db),
+    current_user: User = Depends(get_current_user_sync)
 ):
     """
     Mark departure from centre (EN_CHARGEMENT → EN_ROUTE).
@@ -220,9 +219,7 @@ def depart(
     - Transition: EN_CHARGEMENT → EN_ROUTE
     """
     try:
-        user_id = UUID("00000000-0000-0000-0000-000000000001")
-        
-        bon = BonEnlevementService.depart(db, bon_id, depart, user_id)
+        bon = BonEnlevementService.depart(db, bon_id, depart, current_user.id)
         return bon
     except NotFoundException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -254,7 +251,8 @@ def start_livraison(
 def terminer_bon(
     bon_id: UUID,
     reception: BonEnlevementReception,
-    db: Session = Depends(get_sync_db)
+    db: Session = Depends(get_sync_db),
+    current_user: User = Depends(get_current_user_sync)
 ):
     """
     Complete the Bon d'Enlèvement (EN_LIVRAISON → TERMINE).
@@ -265,9 +263,7 @@ def terminer_bon(
     - Transition: EN_LIVRAISON → TERMINE
     """
     try:
-        user_id = UUID("00000000-0000-0000-0000-000000000001")
-        
-        bon = BonEnlevementService.terminer(db, bon_id, reception, user_id)
+        bon = BonEnlevementService.terminer(db, bon_id, reception, current_user.id)
         return bon
     except NotFoundException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -281,7 +277,8 @@ def terminer_bon(
 def annuler_bon(
     bon_id: UUID,
     reason: str = Query(..., min_length=5, max_length=500),
-    db: Session = Depends(get_sync_db)
+    db: Session = Depends(get_sync_db),
+    current_user: User = Depends(get_current_user_sync)
 ):
     """
     Cancel a Bon d'Enlèvement.
@@ -290,9 +287,7 @@ def annuler_bon(
     Unassigns palettes if any were assigned.
     """
     try:
-        user_id = UUID("00000000-0000-0000-0000-000000000001")
-        
-        bon = BonEnlevementService.annuler(db, bon_id, reason, user_id)
+        bon = BonEnlevementService.annuler(db, bon_id, reason, current_user.id)
         return bon
     except NotFoundException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

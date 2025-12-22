@@ -24,6 +24,18 @@ from app.core.exceptions import NotFoundException, DuplicateException
 router = APIRouter()
 
 
+@router.get("/next-code", response_model=dict)
+def get_next_code(db: Session = Depends(get_sync_db)):
+    """
+    Get the next available centre remplisseur code.
+    
+    Returns:
+        Dictionary with the next code
+    """
+    code = CentreRemplisseurService._generate_code(db)
+    return {"code": code}
+
+
 @router.post("/", response_model=CentreRemplisseurRead, status_code=status.HTTP_201_CREATED)
 def create_centre(
     schema: CentreRemplisseurCreate,
@@ -34,18 +46,13 @@ def create_centre(
     
     - **name**: Name of the filling center
     - **code**: Unique code (auto-generated if not provided)
-    - **partner_id**: ID of the partner (distributeur/GROSSISTE)
+    - **partner_id**: ID of the partner (DISTRIBUTEUR)
     - **address**, **city**, **postal_code**: Location details
     - **latitude**, **longitude**: GPS coordinates (optional)
     - **contact_name**, **contact_phone**: Contact person
     """
-    try:
-        centre = CentreRemplisseurService.create(db, schema)
-        return centre
-    except NotFoundException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except DuplicateException as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    centre = CentreRemplisseurService.create(db, schema)
+    return centre
 
 
 @router.get("/", response_model=List[CentreRemplisseurList])
@@ -78,61 +85,38 @@ def list_centres(
     return centres
 
 
-@router.get("/nearby")
-def get_nearby_centres(
-    latitude: float = Query(..., ge=-90, le=90),
-    longitude: float = Query(..., ge=-180, le=180),
-    radius_km: float = Query(10.0, ge=0.1, le=100),
-    db: Session = Depends(get_sync_db)
-):
-    """
-    Get centres near a GPS location.
-    
-    - **latitude**: Search latitude
-    - **longitude**: Search longitude
-    - **radius_km**: Search radius in kilometers (default: 10km)
-    """
-    centres = CentreRemplisseurService.get_by_location(db, latitude, longitude, radius_km)
-    return centres
-
-
 @router.get("/{centre_id}", response_model=CentreRemplisseurDetail)
 def get_centre(
     centre_id: UUID,
     db: Session = Depends(get_sync_db)
 ):
     """Get a Centre Remplisseur by ID with statistics."""
-    try:
-        stats = CentreRemplisseurService.get_with_stats(db, centre_id)
-        
-        centre = stats["centre_remplisseur"]
-        return CentreRemplisseurDetail(
-            **{
-                "id": centre.id,
-                "name": centre.name,
-                "code": centre.code,
-                "partner_id": centre.partner_id,
-                "address": centre.address,
-                "city": centre.city,
-                "postal_code": centre.postal_code,
-                "country": centre.country,
-                "phone": centre.phone,
-                "email": centre.email,
-                "contact_name": centre.contact_name,
-                "contact_phone": centre.contact_phone,
-                "is_active": centre.is_active,
-                "latitude": centre.latitude,
-                "longitude": centre.longitude,
-                "notes": centre.notes,
-                "created_at": centre.created_at,
-                "updated_at": centre.updated_at,
-                "partner_name": stats["partner_name"],
-                "bons_enlevement_count": stats["bons_enlevement_count"],
-                "bons_retour_count": stats["bons_retour_count"]
-            }
-        )
-    except NotFoundException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    stats = CentreRemplisseurService.get_with_stats(db, centre_id)
+    
+    centre = stats["centre_remplisseur"]
+    return CentreRemplisseurDetail(
+        **{
+            "id": centre.id,
+            "name": centre.name,
+            "code": centre.code,
+            "partner_id": centre.partner_id,
+            "address": centre.address,
+            "city": centre.city,
+            "postal_code": centre.postal_code,
+            "country": centre.country,
+            "phone": centre.phone,
+            "email": centre.email,
+            "contact_name": centre.contact_name,
+            "contact_phone": centre.contact_phone,
+            "is_active": centre.is_active,
+            "notes": centre.notes,
+            "created_at": centre.created_at,
+            "updated_at": centre.updated_at,
+            "partner_name": stats["partner_name"],
+            "bons_enlevement_count": stats["bons_enlevement_count"],
+            "bons_retour_count": stats["bons_retour_count"]
+        }
+    )
 
 
 @router.patch("/{centre_id}", response_model=CentreRemplisseurRead)
@@ -142,13 +126,8 @@ def update_centre(
     db: Session = Depends(get_sync_db)
 ):
     """Update a Centre Remplisseur."""
-    try:
-        centre = CentreRemplisseurService.update(db, centre_id, schema)
-        return centre
-    except NotFoundException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except DuplicateException as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    centre = CentreRemplisseurService.update(db, centre_id, schema)
+    return centre
 
 
 @router.delete("/{centre_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -157,11 +136,8 @@ def delete_centre(
     db: Session = Depends(get_sync_db)
 ):
     """Delete a Centre Remplisseur."""
-    try:
-        CentreRemplisseurService.delete(db, centre_id)
-        return None
-    except NotFoundException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    CentreRemplisseurService.delete(db, centre_id)
+    return None
 
 
 @router.post("/{centre_id}/activate", response_model=CentreRemplisseurRead)
@@ -170,11 +146,8 @@ def activate_centre(
     db: Session = Depends(get_sync_db)
 ):
     """Activate a Centre Remplisseur."""
-    try:
-        centre = CentreRemplisseurService.activate(db, centre_id)
-        return centre
-    except NotFoundException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    centre = CentreRemplisseurService.activate(db, centre_id)
+    return centre
 
 
 @router.post("/{centre_id}/deactivate", response_model=CentreRemplisseurRead)
@@ -183,9 +156,5 @@ def deactivate_centre(
     db: Session = Depends(get_sync_db)
 ):
     """Deactivate a Centre Remplisseur."""
-    try:
-        centre = CentreRemplisseurService.deactivate(db, centre_id)
-        return centre
-    except NotFoundException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-
+    centre = CentreRemplisseurService.deactivate(db, centre_id)
+    return centre

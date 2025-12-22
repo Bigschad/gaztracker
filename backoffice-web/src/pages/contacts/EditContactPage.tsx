@@ -47,6 +47,7 @@ const EditContactPage = () => {
     mutationFn: (data: ContactUpdateFormData) => contactService.update(id!, data),
     onSuccess: () => {
       navigate(`/contacts/${id}`);
+      window.location.reload();
     },
   });
 

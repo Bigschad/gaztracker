@@ -14,10 +14,19 @@ import {
 interface PaletteListParams extends PaginationParams {
   status?: string;
   palette_type?: string;
+  current_centre_remplisseur_id?: string;
   search?: string;
 }
 
 export const paletteService = {
+  // Get next reference code
+  getNextCode: async (): Promise<{ code: string }> => {
+    const response = await apiClient.get<{ code: string }>(
+      `${API_ENDPOINTS.PALETTES.BASE}/next-code`
+    );
+    return response.data;
+  },
+
   // List palettes
   list: async (params?: PaletteListParams): Promise<PaginatedResponse<Palette>> => {
     const response = await apiClient.get<PaginatedResponse<Palette>>(
@@ -126,7 +135,7 @@ export const paletteService = {
 
   // Update palette
   update: async (id: string, data: PaletteUpdate): Promise<Palette> => {
-    const response = await apiClient.put<Palette>(
+    const response = await apiClient.patch<Palette>(
       API_ENDPOINTS.PALETTES.BY_ID(id),
       data
     );

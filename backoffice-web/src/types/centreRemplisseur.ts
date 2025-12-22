@@ -14,8 +14,6 @@ export interface CentreRemplisseur {
   contact_name?: string | null;
   contact_phone?: string | null;
   is_active: boolean;
-  latitude?: number | null;
-  longitude?: number | null;
   notes?: string | null;
   created_at: string;
   updated_at: string;
@@ -49,8 +47,6 @@ export interface CentreRemplisseurCreate {
   contact_name?: string;
   contact_phone?: string;
   is_active?: boolean;
-  latitude?: number;
-  longitude?: number;
   notes?: string;
 }
 
@@ -67,8 +63,6 @@ export interface CentreRemplisseurUpdate {
   contact_name?: string;
   contact_phone?: string;
   is_active?: boolean;
-  latitude?: number;
-  longitude?: number;
   notes?: string;
 }
 

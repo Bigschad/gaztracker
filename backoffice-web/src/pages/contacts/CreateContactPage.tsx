@@ -30,6 +30,7 @@ const CreateContactPage = () => {
     mutationFn: (data: ContactCreateFormData) => contactService.create(data),
     onSuccess: (data) => {
       navigate(`/contacts/${data.id}`);
+      window.location.reload();
     },
   });
 

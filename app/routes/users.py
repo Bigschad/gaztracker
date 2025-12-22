@@ -19,6 +19,7 @@ from app.schemas.user import (
     UserResponse,
     UserListResponse,
     PasswordChange,
+    PasswordReset,
 )
 from app.middleware.auth_middleware import get_current_active_user
 from app.middleware.rbac import require_admin, require_roles
@@ -349,6 +350,48 @@ async def change_password(
     await user_service.change_password(
         user_id=user_id,
         password_data=password_data,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+
+
+@router.put(
+    "/{user_id}/reset-password",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Reset User Password",
+    description="Reset user password (admin only). Admin can reset any user's password without knowing the current password."
+)
+async def reset_password(
+    user_id: UUID,
+    password_data: PasswordReset,
+    request: Request,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+) -> None:
+    """
+    Reset user password (admin only).
+
+    Args:
+        user_id: User ID
+        password_data: Password reset data
+        request: FastAPI request object
+        current_user: Current authenticated user (admin)
+        db: Database session
+
+    Raises:
+        ResourceNotFoundException: If user not found
+    """
+    # Extract client info
+    ip_address, user_agent = get_client_info(request)
+
+    # Initialize user service
+    user_service = UserService(db)
+
+    # Reset password
+    await user_service.reset_password(
+        user_id=user_id,
+        password_data=password_data,
+        reset_by_id=current_user.id,
         ip_address=ip_address,
         user_agent=user_agent
     )

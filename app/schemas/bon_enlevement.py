@@ -21,11 +21,12 @@ class BonEnlevementBase(BaseModel):
     reference: Optional[str] = Field(None, max_length=100, description="Internal reference")
     centre_remplisseur_id: UUID = Field(..., description="Foreign key to the CentreRemplisseur model")
     grossiste_id: UUID = Field(..., description="Foreign key to the Partner model (ordering grossiste)")
-    depot_principal_id: Optional[UUID] = Field(None, description="Foreign key to the Depot model (final destination)")
+    depot_principal_id: UUID = Field(..., description="Foreign key to the Depot model (final destination)")
     vehicule_immatriculation: Optional[str] = Field(None, max_length=50, description="Vehicle registration number")
     chauffeur_nom: Optional[str] = Field(None, max_length=255, description="Name of the driver")
     chauffeur_societe: Optional[str] = Field(None, max_length=255, description="Company of the driver")
     chauffeur_phone: Optional[str] = Field(None, max_length=20, description="Phone number of the driver")
+    date_heure_livraison: Optional[datetime] = Field(None, description="Scheduled delivery date and time")
     observations: Optional[str] = Field(None, max_length=1000, description="Additional observations")
     instructions_livraison: Optional[str] = Field(None, max_length=1000, description="Special delivery instructions")
 
@@ -33,7 +34,8 @@ class BonEnlevementBase(BaseModel):
 # Schema for creating a new BonEnlevement
 class BonEnlevementCreate(BonEnlevementBase):
     """Schema for creating a new BonEnlevement."""
-    pass
+    
+    palette_ids: Optional[List[UUID]] = Field(None, description="Optional list of palette IDs to assign during creation")
 
 
 # Schema for updating an existing BonEnlevement
@@ -45,6 +47,7 @@ class BonEnlevementUpdate(BaseModel):
     chauffeur_nom: Optional[str] = Field(None, max_length=255)
     chauffeur_societe: Optional[str] = Field(None, max_length=255)
     chauffeur_phone: Optional[str] = Field(None, max_length=20)
+    date_heure_livraison: Optional[datetime] = Field(None, description="Scheduled delivery date and time")
     observations: Optional[str] = Field(None, max_length=1000)
     instructions_livraison: Optional[str] = Field(None, max_length=1000)
 

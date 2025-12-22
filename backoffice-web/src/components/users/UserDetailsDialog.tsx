@@ -9,14 +9,13 @@ interface UserDetailsDialogProps {
 }
 
 const getRoleLabel = (role: UserRole): string => {
-  const roleLabels: Record<UserRole, string> = {
+  const roleLabels: Partial<Record<UserRole, string>> = {
     [UserRole.ADMIN]: 'Administrateur',
     [UserRole.RESPONSABLE_LOGISTIQUE]: 'Responsable Logistique',
     [UserRole.OPERATEUR_USINE]: 'Opérateur Usine',
     [UserRole.CHAUFFEUR]: 'Chauffeur',
-    [UserRole.GROSSISTE]: 'Grossiste',
   };
-  return roleLabels[role];
+  return roleLabels[role] || role;
 };
 
 export const UserDetailsDialog = ({ isOpen, onClose, user }: UserDetailsDialogProps) => {

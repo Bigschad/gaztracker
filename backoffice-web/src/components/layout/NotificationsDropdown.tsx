@@ -3,18 +3,28 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
 import { notificationService } from '../../services/api';
+import { useAuth } from '../../hooks/useAuth';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 export const NotificationsDropdown = () => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { isAuthenticated } = useAuth();
 
-  // Fetch notifications
+  // Fetch notifications only if authenticated
   const { data: notifications } = useQuery({
     queryKey: ['notifications-recent'],
     queryFn: () => notificationService.list({ page: 1, page_size: 5 }),
-    refetchInterval: 30000, // Refresh every 30 seconds
+    enabled: isAuthenticated, // Only fetch if user is authenticated
+    refetchInterval: isAuthenticated ? 30000 : false, // Refresh every 30 seconds only if authenticated
+    retry: (failureCount, error: any) => {
+      // Don't retry on 401 errors (unauthorized)
+      if (error?.response?.status === 401) {
+        return false;
+      }
+      return failureCount < 2;
+    },
   });
 
   // Count unread notifications

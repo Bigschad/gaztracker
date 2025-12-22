@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { userService } from '../../services/api';
+import { userService, groupeService, centreRemplisseurService, partnerService } from '../../services/api';
 import { Card, Button, ConfirmDialog } from '../../components/common';
 import { UserFormDialog } from '../../components/users/UserFormDialog';
 import { UserDetailsDialog } from '../../components/users/UserDetailsDialog';
+import { ResetPasswordDialog } from '../../components/users/ResetPasswordDialog';
 import { User } from '../../types';
-import { Plus, Pencil, Trash2, Eye } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, Key } from 'lucide-react';
 
 const UsersListPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -13,12 +14,77 @@ const UsersListPage = () => {
   const [selectedUser, setSelectedUser] = useState<User | undefined>();
   const [userToView, setUserToView] = useState<User | null>(null);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [userToResetPassword, setUserToResetPassword] = useState<User | null>(null);
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: () => userService.list({ page: 1, page_size: 50 }),
   });
+
+  // Fetch companies data for resolving company names
+  const { data: groupes } = useQuery({
+    queryKey: ['groupes', 'users-list'],
+    queryFn: () => groupeService.list({ limit: 100, is_active: true }),
+  });
+
+  const { data: centres } = useQuery({
+    queryKey: ['centres-remplisseurs', 'users-list'],
+    queryFn: () => centreRemplisseurService.list({ limit: 100, is_active: true }),
+  });
+
+  const { data: transporteursData } = useQuery({
+    queryKey: ['partners', 'transporteurs', 'users-list'],
+    queryFn: () => partnerService.list({ page: 1, page_size: 100, type: 'TRANSPORTEUR', is_active: true }),
+  });
+
+  // Create lookup maps for company names
+  const companyNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    
+    // Map groupes (for ADMIN)
+    if (groupes) {
+      groupes.forEach(groupe => {
+        map.set(groupe.id, `${groupe.name} (${groupe.code})`);
+      });
+    }
+    
+    // Map centres remplisseurs (for OPERATEUR_USINE and RESPONSABLE_LOGISTIQUE)
+    if (centres) {
+      centres.forEach(centre => {
+        map.set(centre.id, `${centre.name} (${centre.code})`);
+      });
+    }
+    
+    // Map transporteurs (for CHAUFFEUR)
+    if (transporteursData?.items) {
+      transporteursData.items.forEach(transporteur => {
+        map.set(transporteur.id, `${transporteur.name}${transporteur.code ? ` (${transporteur.code})` : ''}`);
+      });
+    }
+    
+    return map;
+  }, [groupes, centres, transporteursData]);
+
+  // Function to resolve company name from UUID
+  const getCompanyName = (user: User): string => {
+    if (!user.company_name) return '-';
+    
+    // Check if it's already a readable name (not a UUID)
+    // UUIDs are typically 36 characters with dashes
+    if (user.company_name.length !== 36 || !user.company_name.includes('-')) {
+      return user.company_name;
+    }
+    
+    // Resolve based on role
+    const companyName = companyNameMap.get(user.company_name);
+    if (companyName) {
+      return companyName;
+    }
+    
+    // If not found, return the UUID (fallback)
+    return user.company_name;
+  };
 
   const deleteMutation = useMutation({
     mutationFn: (userId: string) => userService.delete(userId),
@@ -59,7 +125,6 @@ const UsersListPage = () => {
       RESPONSABLE_LOGISTIQUE: 'Responsable Logistique',
       OPERATEUR_USINE: 'Opérateur Usine',
       CHAUFFEUR: 'Chauffeur',
-      GROSSISTE: 'Grossiste',
     };
     return roleLabels[role] || role;
   };
@@ -105,7 +170,7 @@ const UsersListPage = () => {
                       {user.phone_number || '-'}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      {user.company_name || '-'}
+                      {getCompanyName(user)}
                     </td>
                     <td className="px-4 py-3">
                       <span className="inline-flex px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">
@@ -149,6 +214,15 @@ const UsersListPage = () => {
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => setUserToResetPassword(user)}
+                          title="Réinitialiser le mot de passe"
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        >
+                          <Key className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleDeleteClick(user)}
                           title="Supprimer"
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -175,6 +249,12 @@ const UsersListPage = () => {
         isOpen={isDetailsOpen}
         onClose={() => setIsDetailsOpen(false)}
         user={userToView}
+      />
+
+      <ResetPasswordDialog
+        isOpen={!!userToResetPassword}
+        onClose={() => setUserToResetPassword(null)}
+        user={userToResetPassword}
       />
 
       <ConfirmDialog

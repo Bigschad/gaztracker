@@ -106,30 +106,6 @@ const DepotDetailsPage = () => {
             <CardTitle>Capacités et Statistiques</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {depot.capacity_b28 !== null && (
-              <div>
-                <p className="text-sm text-muted-foreground">Capacité B28</p>
-                <p className="text-2xl font-bold">{depot.capacity_b28}</p>
-              </div>
-            )}
-            {depot.capacity_b12 !== null && (
-              <div>
-                <p className="text-sm text-muted-foreground">Capacité B12</p>
-                <p className="text-2xl font-bold">{depot.capacity_b12}</p>
-              </div>
-            )}
-            {depot.capacity_b6 !== null && (
-              <div>
-                <p className="text-sm text-muted-foreground">Capacité B6</p>
-                <p className="text-2xl font-bold">{depot.capacity_b6}</p>
-              </div>
-            )}
-            {depot.total_capacity !== null && (
-              <div>
-                <p className="text-sm text-muted-foreground">Capacité totale</p>
-                <p className="text-2xl font-bold">{depot.total_capacity}</p>
-              </div>
-            )}
             <div>
               <p className="text-sm text-muted-foreground">Palettes</p>
               <p className="text-2xl font-bold">{depot.palettes_count || 0}</p>

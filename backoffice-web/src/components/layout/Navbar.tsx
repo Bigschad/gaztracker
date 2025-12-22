@@ -45,7 +45,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
       RESPONSABLE_LOGISTIQUE: 'Responsable Logistique',
       OPERATEUR_USINE: 'Opérateur Usine',
       CHAUFFEUR: 'Chauffeur',
-      GROSSISTE: 'Grossiste',
     };
     return roleLabels[user.role] || user.role;
   };

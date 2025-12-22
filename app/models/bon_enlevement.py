@@ -98,7 +98,7 @@ class BonEnlevement(Base, TimestampMixin):
     reference = Column(
         String(100),
         unique=True,
-        nullable=False,
+        nullable=True,
         index=True,
         comment="Internal reference"
     )
@@ -186,6 +186,13 @@ class BonEnlevement(Base, TimestampMixin):
         DateTime,
         nullable=True,
         comment="Arrival date at main depot"
+    )
+    
+    date_heure_livraison = Column(
+        DateTime,
+        nullable=True,
+        index=True,
+        comment="Scheduled delivery date and time"
     )
     
     # Status

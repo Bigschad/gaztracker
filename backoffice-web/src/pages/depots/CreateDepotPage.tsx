@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
@@ -5,33 +6,70 @@ import { depotService, partnerService } from '../../services/api';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from '../../components/common';
 import { ArrowLeft } from 'lucide-react';
 import { DepotCreate } from '../../types';
+import { useToast } from '../../hooks/useToast';
+import { getErrorDetails } from '../../utils/errorMessages';
 
 const CreateDepotPage = () => {
   const navigate = useNavigate();
+  const { showToast, ToastContainer } = useToast();
+
+  // Fetch next available code
+  const { data: nextCodeData } = useQuery({
+    queryKey: ['depots', 'next-code'],
+    queryFn: () => depotService.getNextCode(),
+  });
+
+  const nextCode = nextCodeData?.code || '';
 
   // Fetch partners (grossistes and revendeurs) for dropdown
   const { data: partnersData } = useQuery({
-    queryKey: ['partners', 'for-depots'],
+    queryKey: ['partners', 'GROSSISTE'],
     queryFn: () => partnerService.list({
       page: 1,
       page_size: 100,
+      type: 'GROSSISTE',
       is_active: true,
     }),
   });
 
   const partners = partnersData?.items || [];
 
-  const { register, handleSubmit, formState: { errors }, control } = useForm<DepotCreate>({
+  const { register, handleSubmit, formState: { errors }, control, setValue } = useForm<DepotCreate>({
     defaultValues: {
       is_active: true,
       is_main_depot: false,
     },
   });
 
+  // Set the auto-generated code when it's loaded
+  useEffect(() => {
+    if (nextCode) {
+      setValue('code', nextCode);
+    }
+  }, [nextCode, setValue]);
+
   const createMutation = useMutation({
     mutationFn: (data: DepotCreate) => depotService.create(data),
     onSuccess: (data) => {
+      showToast({
+        type: 'success',
+        title: 'Succès',
+        message: 'Dépôt créé avec succès',
+        duration: 3000,
+      });
+      setTimeout(() => {
       navigate(`/depots/${data.id}`);
+        window.location.reload();
+      }, 500);
+    },
+    onError: (error) => {
+      const errorDetails = getErrorDetails(error);
+      showToast({
+        type: 'error',
+        title: errorDetails.title,
+        message: errorDetails.message,
+        duration: 7000,
+      });
     },
   });
 
@@ -41,6 +79,7 @@ const CreateDepotPage = () => {
 
   return (
     <div className="w-full">
+      <ToastContainer />
       <div className="mb-6">
         <Link to="/depots">
           <Button variant="ghost" size="sm">
@@ -68,16 +107,22 @@ const CreateDepotPage = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Code</label>
+                <label className="block text-sm font-medium mb-1">Code *</label>
                 <Input
                   error={errors.code?.message}
                   {...register('code')}
-                  placeholder="Code unique du dépôt"
+                  value={nextCode}
+                  disabled
+                  className="bg-gray-100 cursor-not-allowed"
+                  placeholder="Génération automatique..."
                 />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Code généré automatiquement
+                </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Partenaire (Grossiste/Revendeur) *</label>
+                <label className="block text-sm font-medium mb-1">Grossiste*</label>
                 <Controller
                   name="partner_id"
                   control={control}
@@ -104,12 +149,15 @@ const CreateDepotPage = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Adresse</label>
+                <label className="block text-sm font-medium mb-1">Adresse complète (Google Maps / OpenStreetMap)</label>
                 <Input
                   error={errors.address?.message}
                   {...register('address')}
-                  placeholder="Adresse"
+                  placeholder="Ex: 123 Rue Example, Abidjan, Côte d'Ivoire"
                 />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Saisissez l'adresse complète. Les coordonnées GPS seront récupérées automatiquement depuis l'adresse.
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -134,38 +182,6 @@ const CreateDepotPage = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Latitude</label>
-                  <Input
-                    type="number"
-                    step="any"
-                    error={errors.latitude?.message}
-                    {...register('latitude', {
-                      valueAsNumber: true,
-                      min: { value: -90, message: 'Latitude doit être entre -90 et 90' },
-                      max: { value: 90, message: 'Latitude doit être entre -90 et 90' },
-                    })}
-                    placeholder="Latitude GPS"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Longitude</label>
-                  <Input
-                    type="number"
-                    step="any"
-                    error={errors.longitude?.message}
-                    {...register('longitude', {
-                      valueAsNumber: true,
-                      min: { value: -180, message: 'Longitude doit être entre -180 et 180' },
-                      max: { value: 180, message: 'Longitude doit être entre -180 et 180' },
-                    })}
-                    placeholder="Longitude GPS"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
                   <label className="block text-sm font-medium mb-1">Nom du contact</label>
                   <Input
                     error={errors.contact_name?.message}
@@ -184,37 +200,6 @@ const CreateDepotPage = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Capacité B28</label>
-                  <Input
-                    type="number"
-                    error={errors.capacity_b28?.message}
-                    {...register('capacity_b28', { valueAsNumber: true, min: 0 })}
-                    placeholder="Capacité B28"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Capacité B12</label>
-                  <Input
-                    type="number"
-                    error={errors.capacity_b12?.message}
-                    {...register('capacity_b12', { valueAsNumber: true, min: 0 })}
-                    placeholder="Capacité B12"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Capacité B6</label>
-                  <Input
-                    type="number"
-                    error={errors.capacity_b6?.message}
-                    {...register('capacity_b6', { valueAsNumber: true, min: 0 })}
-                    placeholder="Capacité B6"
-                  />
-                </div>
-              </div>
 
               <div>
                 <label className="block text-sm font-medium mb-1">Notes</label>

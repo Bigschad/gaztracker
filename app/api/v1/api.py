@@ -13,7 +13,8 @@ from app.api.v1.endpoints import (
     bons_enlevement,
     bons_reception_retour,
     uploads,
-    theme
+    theme,
+    palettes
 )
 
 
@@ -36,6 +37,12 @@ api_router.include_router(
     depots.router,
     prefix="/depots",
     tags=["Dépôts"]
+)
+
+api_router.include_router(
+    palettes.router,
+    prefix="/palettes",
+    tags=["Palettes"]
 )
 
 # Workflow endpoints

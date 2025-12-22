@@ -22,13 +22,11 @@ class UserRole(str, enum.Enum):
     - RESPONSABLE_LOGISTIQUE: Logistics manager at factory
     - OPERATEUR_USINE: Factory operator
     - CHAUFFEUR: Driver/delivery person
-    - GROSSISTE: Wholesaler/distributor
     """
     ADMIN = "ADMIN"
     RESPONSABLE_LOGISTIQUE = "RESPONSABLE_LOGISTIQUE"
     OPERATEUR_USINE = "OPERATEUR_USINE"
     CHAUFFEUR = "CHAUFFEUR"
-    GROSSISTE = "GROSSISTE"
 
 
 class User(Base, TimestampMixin):
@@ -209,10 +207,6 @@ class User(Base, TimestampMixin):
     def is_admin(self) -> bool:
         """Check if user is an admin."""
         return self.role == UserRole.ADMIN
-
-    def is_grossiste(self) -> bool:
-        """Check if user is a wholesaler."""
-        return self.role == UserRole.GROSSISTE
 
     def is_chauffeur(self) -> bool:
         """Check if user is a driver."""

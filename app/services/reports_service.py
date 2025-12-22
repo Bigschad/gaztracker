@@ -75,28 +75,48 @@ class ReportsService:
             count = query.filter(Palette.status == status).count()
             by_status[status.value] = count
 
-        # Average utilization
-        palettes = query.all()
-        total_utilization = sum(p.utilization_rate for p in palettes if p.utilization_rate)
-        avg_utilization = (total_utilization / len(palettes)) if palettes else 0.0
+        # Calculate utilization rate based on movement counts
+        # Get movement counts per palette
+        movement_counts = self.db.query(
+            Palette.id,
+            func.count(PaletteMovement.id).label('movement_count')
+        ).outerjoin(
+            PaletteMovement, Palette.id == PaletteMovement.palette_id
+        ).group_by(
+            Palette.id
+        ).subquery()
+
+        # Calculate average utilization (based on movement frequency)
+        # Utilization is calculated as: (movements / max_expected_movements) * 100
+        # For simplicity, we'll use a threshold approach: palettes with >10 movements are considered highly utilized
+        palettes_with_movements = self.db.query(
+            func.count(movement_counts.c.id)
+        ).select_from(movement_counts).filter(
+            movement_counts.c.movement_count >= 10
+        ).scalar() or 0
+
+        total_palettes_with_data = query.count()
+        avg_utilization = (palettes_with_movements / total_palettes_with_data * 100) if total_palettes_with_data > 0 else 0.0
 
         # Most used palettes
         most_used = self.db.query(
             Palette.id,
-            Palette.reference_number,
+            Palette.reference_code,
             func.count(PaletteMovement.id).label('movement_count')
         ).join(
             PaletteMovement, Palette.id == PaletteMovement.palette_id
         ).group_by(
-            Palette.id, Palette.reference_number
+            Palette.id, Palette.reference_code
         ).order_by(
             func.count(PaletteMovement.id).desc()
         ).limit(10).all()
 
-        # Palettes needing maintenance (high usage)
-        maintenance_needed = query.filter(
-            Palette.utilization_rate >= 80.0
-        ).count()
+        # Palettes needing maintenance (high usage - more than 20 movements)
+        maintenance_needed = self.db.query(
+            func.count(movement_counts.c.id)
+        ).select_from(movement_counts).filter(
+            movement_counts.c.movement_count >= 20
+        ).scalar() or 0
 
         return {
             "total_palettes": total_palettes,
@@ -105,7 +125,7 @@ class ReportsService:
             "most_used_palettes": [
                 {
                     "id": str(p.id),
-                    "reference": p.reference_number,
+                    "reference": p.reference_code,
                     "movements": p.movement_count
                 }
                 for p in most_used
@@ -170,16 +190,16 @@ class ReportsService:
         logger.info("Generating palette distribution by location...")
 
         distribution = self.db.query(
-            Palette.current_location,
+            Palette.location_address,
             func.count(Palette.id).label('count')
         ).filter(
-            Palette.current_location.isnot(None)
+            Palette.location_address.isnot(None)
         ).group_by(
-            Palette.current_location
+            Palette.location_address
         ).all()
 
         return {
-            row.current_location: row.count
+            row.location_address: row.count
             for row in distribution
         }
 
@@ -810,36 +830,52 @@ class ReportsService:
 
         palettes = self.db.query(Palette).all()
 
+        # Calculate movement counts for utilization rate
+        palette_movement_counts = {}
+        movement_data = self.db.query(
+            PaletteMovement.palette_id,
+            func.count(PaletteMovement.id).label('movement_count')
+        ).group_by(PaletteMovement.palette_id).all()
+        for row in movement_data:
+            palette_movement_counts[row.palette_id] = row.movement_count
+
         if format.lower() == "json":
             return [
                 {
-                    "reference_number": p.reference_number,
-                    "rfid_tag": p.rfid_tag,
+                    "reference_code": p.reference_code,
+                    "rfid_tag": p.rfid_tag.tag_number if p.rfid_tag else None,
                     "status": p.status.value,
                     "capacity": p.capacity,
-                    "current_bottles": p.current_bottles,
-                    "utilization_rate": p.utilization_rate,
-                    "current_location": p.current_location,
+                    "type": p.type.value if p.type else None,
+                    "is_full": p.is_full,
+                    "utilization_rate": round((palette_movement_counts.get(p.id, 0) / 20.0 * 100) if palette_movement_counts.get(p.id, 0) > 0 else 0.0, 2),
+                    "location_address": p.location_address,
+                    "location_latitude": p.location_latitude,
+                    "location_longitude": p.location_longitude,
                     "created_at": p.created_at.isoformat() if p.created_at else None
                 }
                 for p in palettes
             ]
         elif format.lower() == "csv":
             headers = [
-                "reference_number", "rfid_tag", "status", "capacity",
-                "current_bottles", "utilization_rate", "current_location", "created_at"
+                "reference_code", "rfid_tag", "status", "capacity", "type", "is_full",
+                "utilization_rate", "location_address", "location_latitude", "location_longitude", "created_at"
             ]
 
             rows = []
             for p in palettes:
+                utilization = round((palette_movement_counts.get(p.id, 0) / 20.0 * 100) if palette_movement_counts.get(p.id, 0) > 0 else 0.0, 2)
                 rows.append([
-                    p.reference_number,
-                    p.rfid_tag or "",
+                    p.reference_code or "",
+                    p.rfid_tag.tag_number if p.rfid_tag else "",
                     p.status.value,
-                    str(p.capacity),
-                    str(p.current_bottles),
-                    str(p.utilization_rate or 0),
-                    p.current_location or "",
+                    str(p.capacity) if p.capacity else "",
+                    p.type.value if p.type else "",
+                    str(p.is_full),
+                    str(utilization),
+                    p.location_address or "",
+                    str(p.location_latitude) if p.location_latitude else "",
+                    str(p.location_longitude) if p.location_longitude else "",
                     p.created_at.isoformat() if p.created_at else ""
                 ])
 

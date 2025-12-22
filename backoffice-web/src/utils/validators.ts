@@ -16,10 +16,28 @@ export const paletteCreateSchema = z.object({
   palette_type: z.enum(['B6', 'B12', 'B28'], {
     required_error: 'Le type de palette est requis',
   }),
+  condition: z.enum(['NEUVE', 'RECONDITIONNEE'], {
+    required_error: 'La condition de la palette est requise',
+  }).optional(),
   capacity: z.number().min(1, 'La capacité doit être au moins 1').optional(),
   manufacturing_date: z.string().optional().or(z.literal('')),
   rfid_tag_id: z.string().uuid('ID tag RFID invalide').optional().or(z.literal('')),
   current_partner_id: z.string().uuid('ID partenaire invalide').optional().or(z.literal('')),
+  current_centre_remplisseur_id: z.string().uuid('ID centre remplisseur invalide').optional().or(z.literal('')),
+  notes: z.string().optional(),
+});
+
+/**
+ * Palette update validation schema
+ */
+export const paletteUpdateSchema = z.object({
+  palette_type: z.enum(['B6', 'B12', 'B28']).optional(),
+  condition: z.enum(['NEUVE', 'RECONDITIONNEE']).optional(),
+  capacity: z.number().min(1, 'La capacité doit être au moins 1').optional(),
+  manufacturing_date: z.string().optional().or(z.literal('')),
+  rfid_tag_id: z.string().uuid('ID tag RFID invalide').optional().or(z.literal('')),
+  current_partner_id: z.string().uuid('ID partenaire invalide').optional().or(z.literal('')),
+  current_centre_remplisseur_id: z.string().uuid('ID centre remplisseur invalide').optional().or(z.literal('')),
   notes: z.string().optional(),
 });
 
@@ -55,13 +73,14 @@ export const userCreateSchema = z.object({
 });
 
 /**
- * Partner creation validation schema
+ * Partner base validation schema (without refine)
  */
-export const partnerCreateSchema = z.object({
+const partnerBaseSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom ne peut pas dépasser 255 caractères'),
-  type: z.enum(['GROSSISTE', 'FOURNISSEUR', 'TRANSPORTEUR', 'AUTRE'], {
+  type: z.enum(['GROSSISTE', 'DISTRIBUTEUR', 'TRANSPORTEUR', 'AUTRE'], {
     required_error: 'Le type de partenaire est requis',
   }),
+  groupe_id: z.string().uuid('ID groupe invalide').optional().or(z.literal('')),
   address: z.string().max(500, 'L\'adresse ne peut pas dépasser 500 caractères').optional(),
   city: z.string().max(100, 'La ville ne peut pas dépasser 100 caractères').optional(),
   postal_code: z.string().max(20, 'Le code postal ne peut pas dépasser 20 caractères').optional(),
@@ -73,9 +92,23 @@ export const partnerCreateSchema = z.object({
 });
 
 /**
+ * Partner creation validation schema
+ */
+export const partnerCreateSchema = partnerBaseSchema.refine((data) => {
+  // If type is DISTRIBUTEUR, groupe_id is required
+  if (data.type === 'DISTRIBUTEUR') {
+    return data.groupe_id && data.groupe_id.trim() !== '';
+  }
+  return true;
+}, {
+  message: 'Le groupe est requis pour les distributeurs',
+  path: ['groupe_id'],
+});
+
+/**
  * Partner update validation schema
  */
-export const partnerUpdateSchema = partnerCreateSchema.partial();
+export const partnerUpdateSchema = partnerBaseSchema.partial();
 
 /**
  * Contact creation validation schema
@@ -98,6 +131,7 @@ export const contactUpdateSchema = contactCreateSchema.partial();
 
 export type LoginFormData = z.infer<typeof loginSchema>;
 export type PaletteCreateFormData = z.infer<typeof paletteCreateSchema>;
+export type PaletteUpdateFormData = z.infer<typeof paletteUpdateSchema>;
 export type ExpeditionCreateFormData = z.infer<typeof expeditionCreateSchema>;
 export type UserCreateFormData = z.infer<typeof userCreateSchema>;
 export type PartnerCreateFormData = z.infer<typeof partnerCreateSchema>;

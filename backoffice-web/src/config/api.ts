@@ -21,6 +21,7 @@ export const API_ENDPOINTS = {
     BASE: '/api/v1/users',
     BY_ID: (id: string) => `/api/v1/users/${id}`,
     STATISTICS: '/api/v1/users/statistics',
+    RESET_PASSWORD: (id: string) => `/api/v1/users/${id}/reset-password`,
   },
   // Palettes
   PALETTES: {
@@ -100,6 +101,7 @@ export const API_ENDPOINTS = {
   CENTRES_REMPLISSEURS: {
     BASE: '/api/v1/centres-remplisseurs',
     BY_ID: (id: string) => `/api/v1/centres-remplisseurs/${id}`,
+    NEXT_CODE: '/api/v1/centres-remplisseurs/next-code',
     NEARBY: '/api/v1/centres-remplisseurs/nearby',
     ACTIVATE: (id: string) => `/api/v1/centres-remplisseurs/${id}/activate`,
     DEACTIVATE: (id: string) => `/api/v1/centres-remplisseurs/${id}/deactivate`,
@@ -108,6 +110,7 @@ export const API_ENDPOINTS = {
   DEPOTS: {
     BASE: '/api/v1/depots',
     BY_ID: (id: string) => `/api/v1/depots/${id}`,
+    NEXT_CODE: '/api/v1/depots/next-code',
     LOCATIONS: '/api/v1/depots/locations',
     NEARBY: '/api/v1/depots/nearby',
     ACTIVATE: (id: string) => `/api/v1/depots/${id}/activate`,

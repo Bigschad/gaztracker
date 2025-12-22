@@ -1,12 +1,22 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Card, CardHeader, CardTitle, CardContent, Button } from '../../components/common';
+import { Card, CardHeader, CardTitle, CardContent, Button, ConfirmDialog } from '../../components/common';
 import { bonEnlevementService } from '../../services/api';
 import { BonEnlevementList, BonEnlevementStatus } from '../../types';
 import { formatDate } from '../../utils/formatters';
-import { Plus, Eye, TrendingUp, Package, Truck, CheckCircle } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, TrendingUp, Package, Truck, CheckCircle } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
+import { UserRole } from '../../types/user';
 
 const BonsEnlevementHomePage = () => {
+  const [bonToDelete, setBonToDelete] = useState<BonEnlevementList | null>(null);
+  const [bonToValidate, setBonToValidate] = useState<BonEnlevementList | null>(null);
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  const canValidate = user?.role === UserRole.RESPONSABLE_LOGISTIQUE || user?.role === UserRole.ADMIN;
+
   // Fetch recent bons
   const { data: recentBons, isLoading } = useQuery({
     queryKey: ['bons-enlevement-recent'],
@@ -58,6 +68,54 @@ const BonsEnlevementHomePage = () => {
       ANNULE: 'bg-red-100 text-red-800',
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
+  };
+
+  const deleteMutation = useMutation({
+    mutationFn: (bon: BonEnlevementList) => {
+      return bonEnlevementService.annuler(bon.id, 'Suppression par l\'utilisateur');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bons-enlevement'] });
+      setBonToDelete(null);
+    },
+    onError: (error: any) => {
+      console.error('Error deleting bon:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Erreur lors de la suppression';
+      alert(errorMessage);
+    },
+  });
+
+  const handleConfirmDelete = () => {
+    if (bonToDelete) {
+      deleteMutation.mutate(bonToDelete);
+    }
+  };
+
+  const validateMutation = useMutation({
+    mutationFn: (bon: BonEnlevementList) => {
+      if (!user?.id) {
+        throw new Error('Utilisateur non connecté');
+      }
+      return bonEnlevementService.valider(bon.id, {
+        validateur_centre_id: user.id,
+        observations: undefined,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bons-enlevement'] });
+      setBonToValidate(null);
+    },
+    onError: (error: any) => {
+      console.error('Error validating bon:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Erreur lors de la validation';
+      alert(errorMessage);
+    },
+  });
+
+  const handleConfirmValidate = () => {
+    if (bonToValidate) {
+      validateMutation.mutate(bonToValidate);
+    }
   };
 
   return (
@@ -166,11 +224,42 @@ const BonsEnlevementHomePage = () => {
                       <td className="px-4 py-3 text-sm">{formatDate(bon.date_creation)}</td>
                       <td className="px-4 py-3 text-sm">{bon.chauffeur_nom || '-'}</td>
                       <td className="px-4 py-3 text-right">
-                        <Link to={`/bons-enlevement/${bon.id}`}>
-                          <Button variant="secondary" size="sm">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </Link>
+                        <div className="flex items-center justify-end space-x-1">
+                          {bon.status === BonEnlevementStatus.CREATION && (
+                            <>
+                              <Link to={`/bons-enlevement/${bon.id}/edit`}>
+                                <Button variant="ghost" size="sm" title="Modifier">
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              </Link>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setBonToDelete(bon)}
+                                className="text-red-600 hover:text-red-700"
+                                title="Supprimer"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                          {bon.status === BonEnlevementStatus.CREATION && canValidate && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setBonToValidate(bon)}
+                              className="text-green-600 hover:text-green-700"
+                              title="Valider"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Link to={`/bons-enlevement/${bon.id}`}>
+                            <Button variant="ghost" size="sm" title="Voir les détails">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -180,6 +269,30 @@ const BonsEnlevementHomePage = () => {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        isOpen={!!bonToDelete}
+        onClose={() => setBonToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        title="Supprimer le bon d'enlèvement"
+        message={`Êtes-vous sûr de vouloir supprimer le bon d'enlèvement "${bonToDelete?.numero_bon}" ? Cette action est irréversible.`}
+        confirmText="Supprimer"
+        cancelText="Annuler"
+        variant="danger"
+        isLoading={deleteMutation.isPending}
+      />
+
+      <ConfirmDialog
+        isOpen={!!bonToValidate}
+        onClose={() => setBonToValidate(null)}
+        onConfirm={handleConfirmValidate}
+        title="Valider le bon d'enlèvement"
+        message={`Êtes-vous sûr de vouloir valider le bon d'enlèvement "${bonToValidate?.numero_bon}" ? Cette action changera le statut à "Validé".`}
+        confirmText="Valider"
+        cancelText="Annuler"
+        variant="info"
+        isLoading={validateMutation.isPending}
+      />
     </div>
   );
 };

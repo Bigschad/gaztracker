@@ -4,9 +4,9 @@ import { Link } from 'react-router-dom';
 import { paletteService } from '../../services/api';
 import { Card, CardContent, Button } from '../../components/common';
 import { AssignRFIDDialog } from '../../components/palettes';
-import { Plus, Eye, Tag } from 'lucide-react';
+import { Plus, Eye, Tag, Edit } from 'lucide-react';
 import { formatDate, getStatusColor, formatStatus } from '../../utils/formatters';
-import { Palette } from '../../types';
+import { Palette, PaletteCondition } from '../../types';
 
 const PalettesListPage = () => {
   const [page, setPage] = useState(1);
@@ -64,6 +64,7 @@ const PalettesListPage = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
+                    <th className="px-4 py-3 text-left text-sm font-medium">Code de référence</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">Tag RFID</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">Type</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">Statut</th>
@@ -75,6 +76,11 @@ const PalettesListPage = () => {
                 <tbody>
                   {data.items.map((palette) => (
                   <tr key={palette.id} className="border-b hover:bg-accent/50">
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-sm font-semibold">
+                        {palette.reference_code || palette.serial_number || '-'}
+                      </span>
+                    </td>
                     <td className="px-4 py-3">
                       {palette.rfid_tag ? (
                         <div className="flex items-center space-x-2">
@@ -97,15 +103,40 @@ const PalettesListPage = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3">
+                      {palette.condition ? (
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded ${
+                          palette.condition === PaletteCondition.NEUVE
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-orange-100 text-orange-800'
+                        }`}>
+                          {palette.condition === PaletteCondition.NEUVE ? 'Neuve' : 'Reconditionnée'}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-gray-400 italic">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded ${getStatusColor(String(palette.status || ''))}`}>
                         {formatStatus(String(palette.status || ''))}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      {palette.location_address ||
-                       (palette.location_latitude && palette.location_longitude
-                         ? `${palette.location_latitude.toFixed(4)}, ${palette.location_longitude.toFixed(4)}`
-                         : '-')}
+                      {palette.current_centre_remplisseur ? (
+                        <div>
+                          <span className="font-medium">{palette.current_centre_remplisseur.name}</span>
+                          {palette.current_centre_remplisseur.code && (
+                            <span className="text-xs text-muted-foreground ml-1">
+                              ({palette.current_centre_remplisseur.code})
+                            </span>
+                          )}
+                        </div>
+                      ) : palette.location_address ? (
+                        palette.location_address
+                      ) : palette.location_latitude && palette.location_longitude ? (
+                        `${palette.location_latitude.toFixed(4)}, ${palette.location_longitude.toFixed(4)}`
+                      ) : (
+                        '-'
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm">{formatDate(palette.created_at)}</td>
                     <td className="px-4 py-3 text-right">
@@ -121,6 +152,11 @@ const PalettesListPage = () => {
                         <Link to={`/palettes/${palette.id}`}>
                           <Button variant="ghost" size="sm" title="Voir les détails">
                             <Eye className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Link to={`/palettes/${palette.id}/edit`}>
+                          <Button variant="ghost" size="sm" title="Modifier">
+                            <Edit className="h-4 w-4" />
                           </Button>
                         </Link>
                       </div>

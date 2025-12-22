@@ -25,6 +25,13 @@ const PartnersListPage = () => {
     retry: 1,
   });
 
+  // Filter out DISTRIBUTEUR partners from the results
+  const filteredData = data ? {
+    ...data,
+    items: data.items.filter((partner: Partner) => partner.type !== PartnerType.DISTRIBUTEUR),
+    total: data.items.filter((partner: Partner) => partner.type !== PartnerType.DISTRIBUTEUR).length,
+  } : undefined;
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => partnerService.delete(id),
     onSuccess: () => {
@@ -36,7 +43,7 @@ const PartnersListPage = () => {
   const getTypeLabel = (type: PartnerType) => {
     const labels: Record<PartnerType, string> = {
       GROSSISTE: 'Grossiste',
-      FOURNISSEUR: 'Fournisseur',
+      DISTRIBUTEUR: 'Distributeur',
       TRANSPORTEUR: 'Transporteur',
       AUTRE: 'Autre',
     };
@@ -48,7 +55,7 @@ const PartnersListPage = () => {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">Partenaires</h1>
-          <p className="text-muted-foreground">Gérer vos partenaires (grossistes, fournisseurs, transporteurs)</p>
+          <p className="text-muted-foreground">Gérer vos partenaires (grossistes, transporteurs)</p>
         </div>
         <Link to="/partners/new">
           <Button>
@@ -70,7 +77,6 @@ const PartnersListPage = () => {
         >
           <option value="">Tous les types</option>
           <option value="GROSSISTE">Grossiste</option>
-          <option value="FOURNISSEUR">Fournisseur</option>
           <option value="TRANSPORTEUR">Transporteur</option>
           <option value="AUTRE">Autre</option>
         </select>
@@ -99,7 +105,7 @@ const PartnersListPage = () => {
                 {error instanceof Error ? error.message : 'Une erreur est survenue'}
               </div>
             </div>
-          ) : !data || !data.items || data.items.length === 0 ? (
+          ) : !filteredData || !filteredData.items || filteredData.items.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
               Aucun partenaire trouvé
             </div>
@@ -119,7 +125,7 @@ const PartnersListPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.items.map((partner: Partner) => (
+                  {filteredData.items.map((partner: Partner) => (
                     <tr key={partner.id} className="border-b hover:bg-accent/50">
                       <td className="px-4 py-3 font-medium">{partner.name}</td>
                       <td className="px-4 py-3">
@@ -168,10 +174,10 @@ const PartnersListPage = () => {
                 </tbody>
               </table>
 
-              {data && data.total_pages > 1 && (
+              {filteredData && filteredData.items.length > 0 && (
                 <div className="flex items-center justify-between px-4 py-3 border-t">
                   <p className="text-sm text-muted-foreground">
-                    Page {data.page} sur {data.total_pages} ({data.total} résultats)
+                    {filteredData.items.length} résultat{filteredData.items.length > 1 ? 's' : ''} affiché{filteredData.items.length > 1 ? 's' : ''}
                   </p>
                   <div className="flex space-x-2">
                     <Button
@@ -186,7 +192,7 @@ const PartnersListPage = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => setPage(p => p + 1)}
-                      disabled={page >= data.total_pages}
+                      disabled={!data || page >= data.total_pages}
                     >
                       Suivant
                     </Button>
