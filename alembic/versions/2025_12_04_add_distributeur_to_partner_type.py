@@ -9,7 +9,7 @@ Add DISTRIBUTEUR value to partner_type enum (replaces FOURNISSEUR).
 from typing import Sequence, Union
 
 from alembic import op
-from sqlalchemy import text
+from sqlalchemy import text, create_engine
 
 
 # revision identifiers, used by Alembic.
@@ -21,13 +21,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema: Add DISTRIBUTEUR to partner_type enum and update existing data."""
-    # Add 'DISTRIBUTEUR' value to the existing partner_type enum if it doesn't exist
-    # PostgreSQL doesn't support IF NOT EXISTS for ALTER TYPE ADD VALUE, so we use a DO block
-    # Note: ALTER TYPE ADD VALUE cannot be rolled back and may require a commit
-    # We use a separate connection to ensure the enum value is available
+    # PostgreSQL doesn't allow using a new enum value in the same transaction where it's created.
+    # We need to commit the enum addition before using it. We use a separate connection with
+    # autocommit to add the enum value, then use the main connection to update data.
     connection = op.get_bind()
     
-    # Check if DISTRIBUTEUR already exists
+    # Step 1: Check if DISTRIBUTEUR already exists
     result = connection.execute(text("""
         SELECT EXISTS (
             SELECT 1 FROM pg_enum 
@@ -38,14 +37,38 @@ def upgrade() -> None:
     enum_exists = result.scalar()
     
     if not enum_exists:
-        # Add the enum value - this cannot be rolled back
-        # Note: PostgreSQL doesn't support IF NOT EXISTS for ALTER TYPE ADD VALUE
-        # So we check first and only add if it doesn't exist
-        connection.execute(text("ALTER TYPE partner_type ADD VALUE 'DISTRIBUTEUR'"))
+        # DISTRIBUTEUR doesn't exist - we need to add it
+        # PostgreSQL requires enum values to be committed before use
+        # We use a workaround: create a separate connection that autocommits
+        from app.config import settings
+        
+        # Get database URL and create a separate engine with autocommit
+        db_url = settings.DATABASE_URL.replace(
+            "postgresql+asyncpg://", "postgresql+psycopg2://"
+        )
+        temp_engine = create_engine(db_url, isolation_level="AUTOCOMMIT")
+        
+        with temp_engine.connect() as temp_conn:
+            # Add DISTRIBUTEUR enum value in autocommit mode
+            # PostgreSQL doesn't support IF NOT EXISTS, so we check first
+            check_result = temp_conn.execute(text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM pg_enum 
+                    WHERE enumlabel = 'DISTRIBUTEUR' 
+                    AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'partner_type')
+                )
+            """))
+            if not check_result.scalar():
+                try:
+                    temp_conn.execute(text("ALTER TYPE partner_type ADD VALUE 'DISTRIBUTEUR'"))
+                except Exception:
+                    # If it fails, the enum might already exist from a concurrent operation
+                    pass
+        
+        temp_engine.dispose()
     
-    # Now update existing FOURNISSEUR records to DISTRIBUTEUR
-    # Use a safe approach that handles the case where FOURNISSEUR might not exist
-    # We cast to text first to avoid enum comparison issues
+    # Step 2: Now update existing FOURNISSEUR records to DISTRIBUTEUR
+    # DISTRIBUTEUR should now be available since it was committed above
     connection.execute(text("""
         UPDATE partners 
         SET type = 'DISTRIBUTEUR'::partner_type 
